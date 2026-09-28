@@ -1,0 +1,30 @@
+[
+    {
+        "id": 1,
+        "titulo": "Nuevas empresas priorizan talento digital y habilidades prácticas",
+        "resumen": "La demanda por perfiles técnicos y resolución de problemas crece en sectores clave del mercado laboral.",
+        "fecha": "2026-08-20",
+        "imagen": "img/noticias/parte1.jpg"
+    },
+    {
+        "id": 2,
+        "titulo": "Avances en inteligencia artificial mejoran para ambientes laborales",
+        "resumen": "Las herramientas de IA están optimizando la productividad, la coordinación y el análisis del trabajo actual.",
+        "fecha": "2026-08-25",
+        "imagen": "img/noticias/parte2.jpg"
+    },
+    {
+        "id": 3,
+        "titulo": "Más empresas ofrecen trabajo híbrido y mayor flexibilidad",
+        "resumen": "Los profesionales buscan opciones con mejor equilibrio entre desempeño, bienestar y autonomía laboral.",
+        "fecha": "2026-08-28",
+        "imagen": "img/noticias/parte3.jpg"
+    },
+    {
+        "id": 4,
+        "titulo": "La capacitación continua se convierte en ventaja competitiva",
+        "resumen": "Cursos, certificaciones y actualización técnica ayudan a reforzar la empleabilidad en un mercado dinámico.",
+        "fecha": "2026-09-01",
+        "imagen": "img/noticias/parte4.jpg"
+    }
+]

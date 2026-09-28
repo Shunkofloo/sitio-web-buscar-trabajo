@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Lista de Noticias{% endblock %}
+{% block content %}
+<section class="page-header text-center">
+    <div class="container">
+        <h1 class="display-6 fw-bold mb-2">Últimas noticias</h1>
+        <p class="mb-0">Información clave y análisis de actualidad.</p>
+    </div>
+</section>
+
+<div class="d-flex flex-wrap gap-2 align-items-center justify-content-between my-4">
+    <a class="btn btn-primary" href="#agregar">Agregar</a>
+    <form class="d-flex gap-2" method="get" role="search">
+        <label class="visually-hidden" for="buscar-noticia">Buscar noticias</label>
+        <input class="form-control" id="buscar-noticia" name="q" value="{{ query }}" placeholder="Título o contenido">
+        <button class="btn btn-outline-primary" type="submit">Buscar</button>
+    </form>
+</div>
+
+<div class="row g-4">
+    {% for noticia in noticias %}
+    <div class="col-md-6">
+        <div class="card h-100 news-card">
+            <img src="{% static noticia.imagen %}" class="card-img-top featured-image" alt="{{ noticia.titulo }}">
+            <div class="card-body">
+                <span class="badge badge-soft mb-2">{{ noticia.categoria.nombre }}</span>
+                <h5 class="card-title fw-bold">{{ noticia.titulo }}</h5>
+                <p class="card-text text-muted">{{ noticia.resumen }}</p>
+                <small class="text-muted">{{ noticia.fecha|date:'d/m/Y' }}</small>
+                <div class="d-flex gap-2 mt-3">
+                    <a class="btn btn-sm btn-outline-secondary" href="#modificar-{{ noticia.pk }}">Modificar</a>
+                    <a class="btn btn-sm btn-outline-danger" href="#eliminar-{{ noticia.pk }}">Eliminar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12"><p class="text-center py-4">No hay noticias registradas.</p></div>
+    {% endfor %}
+</div>
+{% endblock %}

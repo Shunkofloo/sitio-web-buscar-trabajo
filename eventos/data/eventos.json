@@ -1,0 +1,16 @@
+[
+    {
+        "id": 1,
+        "nombre": "Feria de Innovación Tecnológica",
+        "lugar": "Centro de Convenciones",
+        "fecha": "2026-09-10",
+        "imagen": "img/eventos/foto1.jpg"
+    },
+    {
+        "id": 2,
+        "nombre": "Encuentro de Desarrolladores Django",
+        "lugar": "Auditorio Central",
+        "fecha": "2026-09-15",
+        "imagen": "img/eventos/foto1.jpg"
+    }
+]

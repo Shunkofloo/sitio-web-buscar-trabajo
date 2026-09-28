@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Eventos{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1 class="display-6 fw-bold mb-2">Eventos</h1>
+    <p class="mb-0">Actividades y encuentros registrados.</p>
+</section>
+
+<div class="d-flex flex-wrap gap-2 align-items-center justify-content-between my-4">
+    <a class="btn btn-primary" href="#agregar">Agregar</a>
+    <form class="d-flex gap-2" method="get" role="search">
+        <label class="visually-hidden" for="buscar-evento">Buscar eventos</label>
+        <input class="form-control" id="buscar-evento" name="q" value="{{ query }}" placeholder="Nombre o lugar">
+        <button class="btn btn-outline-primary" type="submit">Buscar</button>
+    </form>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead><tr><th>Evento</th><th>Lugar</th><th>Fecha</th><th>Imagen</th><th>Acciones</th></tr></thead>
+        <tbody>
+            {% for evento in eventos %}
+            <tr>
+                <td>{{ evento.nombre }}</td>
+                <td>{{ evento.lugar }}</td>
+                <td>{{ evento.fecha|date:'d/m/Y' }}</td>
+                <td>{% if evento.imagen %}<img src="{% static evento.imagen %}" alt="" width="72">{% else %}Sin imagen{% endif %}</td>
+                <td class="text-nowrap"><a class="btn btn-sm btn-outline-secondary" href="#modificar-{{ evento.pk }}">Modificar</a> <a class="btn btn-sm btn-outline-danger" href="#eliminar-{{ evento.pk }}">Eliminar</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center py-4">No hay eventos registrados.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

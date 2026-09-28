@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Vacantes{% endblock %}
+{% block content %}
+<section class="hero-section p-5 mb-5">
+    <div class="row align-items-center g-4">
+        <div class="col-lg-7">
+            <span class="badge badge-soft px-3 py-2 mb-3">Oportunidades destacadas</span>
+            <h1 class="display-5 fw-bold mb-3">Encuentra la próxima oportunidad laboral que te impulsa</h1>
+            <p class="lead mb-4">Explora vacantes, perfiles profesionales y empresas que buscan talento para crecer contigo.</p>
+            <div class="d-flex gap-3 flex-wrap">
+                <a href="{% url 'ofertas_lista' %}" class="btn btn-light btn-lg">Ver vacantes</a>
+                <a href="{% url 'noticias_inicio' %}" class="btn btn-outline-light btn-lg">Ir a noticias</a>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="event-visual" aria-label="Vacantes destacadas ilustración">
+                <div class="event-moon"></div>
+                <div class="event-star">★</div>
+                <div class="event-caption">VACANTES</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="section-card h-100 p-4">
+            <div class="feature-icon mb-3">💼</div>
+            <h4>Empleos actuales</h4>
+            <p class="text-muted mb-0">Consulta vacantes activas con perfiles, requisitos y oportunidades reales para aplicar.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="section-card h-100 p-4">
+            <div class="feature-icon mb-3">🤝</div>
+            <h4>Red de contacto</h4>
+            <p class="text-muted mb-0">Conecta con personas, empresas y comunidades para ampliar tus opciones laborales.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="section-card h-100 p-4">
+            <div class="feature-icon mb-3">📈</div>
+            <h4>Crecimiento profesional</h4>
+            <p class="text-muted mb-0">Descubre caminos para avanzar, aprender nuevas habilidades y crecer en tu carrera.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

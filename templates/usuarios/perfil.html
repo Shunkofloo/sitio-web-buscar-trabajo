@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Mi perfil profesional{% endblock %}
+{% block content %}
+<section class="page-header text-center">
+    <div class="container">
+        <h1 class="display-6 fw-bold mb-2">Mi perfil profesional</h1>
+        <p class="mb-0">Sesión iniciada correctamente. Tu próximo paso profesional está a un clic.</p>
+    </div>
+</section>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="section-card p-4">
+            <h4 class="fw-bold mb-3">Hola, {{ nombre_usuario }} 👋</h4>
+            <ul class="list-group list-group-flush mb-4">
+                <li class="list-group-item"><strong>Usuario:</strong> {{ usuario }}</li>
+                <li class="list-group-item"><strong>Rol:</strong> {{ rol_usuario }}</li>
+                <li class="list-group-item"><strong>Fecha y hora de acceso:</strong> {{ fecha_actual }}</li>
+            </ul>
+            <a href="{% url 'usuarios_logout' %}" class="btn btn-outline-danger">Cerrar sesión</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

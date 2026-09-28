@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Noticias laborales{% endblock %}
+{% block content %}
+<section class="page-header text-center">
+    <div class="container">
+        <h1 class="display-6 fw-bold mb-2">Noticias laborales</h1>
+        <p class="mb-0">Actualidad, tendencias y recursos para cuidar tu carrera profesional.</p>
+    </div>
+</section>
+
+<div class="row align-items-center mb-4 g-4">
+    <div class="col-lg-6">
+        <img src="{% static 'img/noticias/foto1.jpg' %}" class="img-fluid rounded-4 shadow" alt="Noticias laborales" style="width: 100%; height: 320px; object-fit: cover;">
+    </div>
+    <div class="col-lg-6">
+        <h2 class="fw-bold mb-3">Lo más reciente</h2>
+        <p class="text-muted lead">Encuentra consejos, tendencias del mercado y noticias que te ayudan a preparar mejor tu próxima búsqueda laboral.</p>
+        <a href="{% url 'noticias_lista' %}" class="btn btn-primary btn-lg">Ver noticias</a>
+    </div>
+</div>
+{% endblock %}

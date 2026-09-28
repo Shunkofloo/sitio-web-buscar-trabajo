@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}Vacantes disponibles{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1 class="display-6 fw-bold mb-2">Vacantes disponibles</h1>
+    <p class="mb-0">Ofertas laborales publicadas por las empresas.</p>
+</section>
+
+<div class="d-flex flex-wrap gap-2 align-items-center justify-content-between my-4">
+    <a class="btn btn-primary" href="#agregar">Agregar</a>
+    <form class="d-flex gap-2" method="get" role="search">
+        <label class="visually-hidden" for="buscar-oferta">Buscar vacantes</label>
+        <input class="form-control" id="buscar-oferta" name="q" value="{{ query }}" placeholder="Cargo, empresa o ubicación">
+        <button class="btn btn-outline-primary" type="submit">Buscar</button>
+    </form>
+</div>
+
+<div class="row g-4">
+    {% for oferta in ofertas %}
+    <div class="col-12">
+        <article class="job-card h-100">
+            <div class="d-flex flex-wrap justify-content-between gap-2">
+                <div>
+                    <span class="badge badge-soft mb-2">{{ oferta.categoria.nombre }}</span>
+                    <h2 class="h4 mb-1">{{ oferta.titulo }}</h2>
+                    <p class="mb-3">{{ oferta.empresa.nombre }} · {{ oferta.ubicacion }}</p>
+                </div>
+                <span class="badge text-bg-success align-self-start">{{ oferta.get_modalidad_display }}</span>
+            </div>
+            <p>{{ oferta.descripcion }}</p>
+            {% if oferta.requisitos %}
+            <p><strong>Requisitos:</strong> {{ oferta.requisitos }}</p>
+            {% endif %}
+            {% if oferta.salario_minimo or oferta.salario_maximo %}
+            <p><strong>Renta:</strong>
+                {% if oferta.salario_minimo %}$ {{ oferta.salario_minimo|floatformat:0 }}{% endif %}
+                {% if oferta.salario_minimo and oferta.salario_maximo %} - {% endif %}
+                {% if oferta.salario_maximo %}$ {{ oferta.salario_maximo|floatformat:0 }}{% endif %}
+            </p>
+            {% endif %}
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                {% if oferta.empresa.correo_contacto %}
+                <a class="btn btn-primary" href="mailto:{{ oferta.empresa.correo_contacto }}?subject=Postulación%20{{ oferta.titulo|urlencode }}">Contactar empresa</a>
+                {% endif %}
+                {% if oferta.empresa.sitio_web %}
+                <a class="btn btn-outline-secondary" href="{{ oferta.empresa.sitio_web }}" target="_blank" rel="noopener">Sitio de la empresa</a>
+                {% endif %}
+                <a class="btn btn-sm btn-outline-secondary ms-auto" href="#modificar-{{ oferta.pk }}">Modificar</a>
+                <a class="btn btn-sm btn-outline-danger" href="#eliminar-{{ oferta.pk }}">Eliminar</a>
+            </div>
+        </article>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <p class="text-center py-4">No hay vacantes publicadas que coincidan con la búsqueda.</p>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

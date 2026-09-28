@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Buscar trabajo{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'eventos_inicio' %}">Buscar trabajo</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNavbar">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link" href="{% url 'ofertas_lista' %}">Vacantes</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{% url 'noticias_inicio' %}">Noticias</a></li>
+                    {% if request.user.is_authenticated and request.user.is_staff %}
+                        <li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}">Administración</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'usuarios_logout' %}">👤 {{ request.user.username }} · Cerrar sesión</a></li>
+                    {% elif request.session.usuario_autenticado %}
+                        <li class="nav-item"><a class="nav-link" href="{% url 'usuarios_perfil' %}">👤 {{ request.session.nombre_usuario }}</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{% url 'usuarios_logout' %}">Cerrar sesión</a></li>
+                    {% else %}
+                        <li class="nav-item"><a class="nav-link" href="{% url 'usuarios_login' %}">Iniciar sesión</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container my-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <footer class="footer-site text-center py-4 mt-5">
+        <div class="container">
+            <p class="mb-0">&copy; 2026 Buscar trabajo - Proyecto Django</p>
+        </div>
+    </footer>
+
+    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+</body>
+</html>
