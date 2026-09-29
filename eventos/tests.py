@@ -38,6 +38,26 @@ class EventoListadoTests(TestCase):
 	def test_evento_esta_registrado_en_admin(self):
 		self.assertIn(Evento, admin.site._registry)
 
+	def test_visitante_no_ve_acciones_de_edicion(self):
+		response = self.client.get('/eventos/lista/')
+
+		self.assertNotContains(response, 'Modificar')
+		self.assertNotContains(response, 'Eliminar')
+		self.assertNotContains(response, 'Agregar evento')
+
+	def test_superusuario_ve_enlace_real_para_modificar_evento(self):
+		administrador = get_user_model().objects.create_superuser(
+			username='admin_eventos',
+			email='admin-eventos@example.com',
+			password='clave-admin-segura',
+		)
+		self.client.force_login(administrador)
+
+		response = self.client.get('/eventos/lista/')
+
+		self.assertContains(response, f'/admin/eventos/evento/{self.evento.pk}/change/')
+		self.assertContains(response, '/admin/eventos/evento/add/')
+
 
 class GestionOfertasAdminTests(TestCase):
 	def setUp(self):
@@ -104,7 +124,7 @@ class OfertasPublicasTests(TestCase):
 		)
 		self.categoria = CategoriaOferta.objects.create(nombre='Desarrollo')
 		self.publicada = OfertaLaboral.objects.create(
-			titulo='Desarrollador Python',
+			titulo='OfertaUnicaPythonXYZ',
 			descripcion='Construir servicios web.',
 			ubicacion='La Serena',
 			estado=OfertaLaboral.Estado.PUBLICADA,
@@ -129,10 +149,38 @@ class OfertasPublicasTests(TestCase):
 		self.assertContains(response, 'trabajos@example.com')
 
 	def test_busqueda_filtra_ofertas_publicadas(self):
-		response = self.client.get('/ofertas/', {'q': 'Python'})
+		response = self.client.get('/ofertas/', {'q': 'UnicaPythonXYZ'})
 
 		self.assertContains(response, self.publicada.titulo)
 		self.assertEqual(list(response.context['ofertas']), [self.publicada])
+
+	def test_visitante_no_ve_ni_puede_abrir_acciones_de_admin(self):
+		response = self.client.get('/ofertas/')
+
+		self.assertNotContains(response, 'Modificar')
+		self.assertNotContains(response, 'Eliminar')
+		self.assertNotContains(response, 'Agregar oferta')
+		edit_response = self.client.get(
+			f'/admin/eventos/ofertalaboral/{self.publicada.pk}/change/'
+		)
+		self.assertEqual(edit_response.status_code, 302)
+
+	def test_superusuario_ve_enlaces_reales_de_gestion_de_ofertas(self):
+		administrador = get_user_model().objects.create_superuser(
+			username='admin_ofertas',
+			email='admin-ofertas@example.com',
+			password='clave-admin-segura',
+		)
+		self.client.force_login(administrador)
+
+		response = self.client.get('/ofertas/')
+
+		self.assertContains(
+			response,
+			f'/admin/eventos/ofertalaboral/{self.publicada.pk}/change/',
+		)
+		self.assertContains(response, '/admin/eventos/ofertalaboral/add/')
+		self.assertContains(response, f'/admin/eventos/ofertalaboral/{self.publicada.pk}/delete/')
 
 	def test_portada_enlaza_al_listado_de_ofertas(self):
 		response = self.client.get('/eventos/')

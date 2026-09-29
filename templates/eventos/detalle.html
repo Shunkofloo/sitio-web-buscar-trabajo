@@ -8,7 +8,9 @@
 </section>
 
 <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between my-4">
-    <a class="btn btn-primary" href="#agregar">Agregar</a>
+    {% if perms.eventos.add_evento %}
+    <a class="btn btn-primary" href="{% url 'admin:eventos_evento_add' %}">Agregar evento</a>
+    {% endif %}
     <form class="d-flex gap-2" method="get" role="search">
         <label class="visually-hidden" for="buscar-evento">Buscar eventos</label>
         <input class="form-control" id="buscar-evento" name="q" value="{{ query }}" placeholder="Nombre o lugar">
@@ -26,7 +28,10 @@
                 <td>{{ evento.lugar }}</td>
                 <td>{{ evento.fecha|date:'d/m/Y' }}</td>
                 <td>{% if evento.imagen %}<img src="{% static evento.imagen %}" alt="" width="72">{% else %}Sin imagen{% endif %}</td>
-                <td class="text-nowrap"><a class="btn btn-sm btn-outline-secondary" href="#modificar-{{ evento.pk }}">Modificar</a> <a class="btn btn-sm btn-outline-danger" href="#eliminar-{{ evento.pk }}">Eliminar</a></td>
+                <td class="text-nowrap">
+                    {% if perms.eventos.change_evento %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'admin:eventos_evento_change' evento.pk %}">Modificar</a>{% endif %}
+                    {% if perms.eventos.delete_evento %}<a class="btn btn-sm btn-outline-danger" href="{% url 'admin:eventos_evento_delete' evento.pk %}">Eliminar</a>{% endif %}
+                </td>
             </tr>
             {% empty %}
             <tr><td colspan="5" class="text-center py-4">No hay eventos registrados.</td></tr>

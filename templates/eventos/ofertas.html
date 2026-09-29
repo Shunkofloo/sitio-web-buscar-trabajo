@@ -3,11 +3,13 @@
 {% block content %}
 <section class="page-header">
     <h1 class="display-6 fw-bold mb-2">Vacantes disponibles</h1>
-    <p class="mb-0">Ofertas laborales publicadas por las empresas.</p>
+    <p class="mb-0">Ofertas laborales y prácticas profesionales.</p>
 </section>
 
 <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between my-4">
-    <a class="btn btn-primary" href="#agregar">Agregar</a>
+    {% if perms.eventos.add_ofertalaboral %}
+    <a class="btn btn-primary" href="{% url 'admin:eventos_ofertalaboral_add' %}">Agregar oferta</a>
+    {% endif %}
     <form class="d-flex gap-2" method="get" role="search">
         <label class="visually-hidden" for="buscar-oferta">Buscar vacantes</label>
         <input class="form-control" id="buscar-oferta" name="q" value="{{ query }}" placeholder="Cargo, empresa o ubicación">
@@ -32,10 +34,10 @@
             <p><strong>Requisitos:</strong> {{ oferta.requisitos }}</p>
             {% endif %}
             {% if oferta.salario_minimo or oferta.salario_maximo %}
-            <p><strong>Renta:</strong>
+            <p><strong>Renta bruta referencial mensual:</strong>
                 {% if oferta.salario_minimo %}$ {{ oferta.salario_minimo|floatformat:0 }}{% endif %}
                 {% if oferta.salario_minimo and oferta.salario_maximo %} - {% endif %}
-                {% if oferta.salario_maximo %}$ {{ oferta.salario_maximo|floatformat:0 }}{% endif %}
+                {% if oferta.salario_maximo %}$ {{ oferta.salario_maximo|floatformat:0 }}{% endif %} CLP
             </p>
             {% endif %}
             <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
@@ -45,8 +47,12 @@
                 {% if oferta.empresa.sitio_web %}
                 <a class="btn btn-outline-secondary" href="{{ oferta.empresa.sitio_web }}" target="_blank" rel="noopener">Sitio de la empresa</a>
                 {% endif %}
-                <a class="btn btn-sm btn-outline-secondary ms-auto" href="#modificar-{{ oferta.pk }}">Modificar</a>
-                <a class="btn btn-sm btn-outline-danger" href="#eliminar-{{ oferta.pk }}">Eliminar</a>
+                {% if perms.eventos.change_ofertalaboral %}
+                <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'admin:eventos_ofertalaboral_change' oferta.pk %}">Modificar</a>
+                {% endif %}
+                {% if perms.eventos.delete_ofertalaboral %}
+                <a class="btn btn-sm btn-outline-danger" href="{% url 'admin:eventos_ofertalaboral_delete' oferta.pk %}">Eliminar</a>
+                {% endif %}
             </div>
         </article>
     </div>
@@ -56,4 +62,5 @@
     </div>
     {% endfor %}
 </div>
+<p class="text-muted small mt-4">Avisos de demostración. Los montos son referenciales mensuales en CLP y deben confirmarse con cada empleador.</p>
 {% endblock %}
