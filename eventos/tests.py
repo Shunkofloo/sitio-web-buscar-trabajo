@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
-from usuarios.models import PerfilPostulante, UsuarioSitio
+from usuarios.models import PerfilPostulante
 
 from .models import (
 	CategoriaOferta,
@@ -61,14 +61,8 @@ class EventoListadoTests(TestCase):
 
 class GestionOfertasAdminTests(TestCase):
 	def setUp(self):
-		usuario = UsuarioSitio.objects.create(
-			usuario='postulante_test',
-			password='clave-segura',
-			nombre='Postulante de prueba',
-			rol='invitado',
-		)
 		self.perfil = PerfilPostulante.objects.create(
-			usuario=usuario,
+			nombre_completo='Postulante de prueba',
 			profesion='Desarrollador',
 		)
 		self.empresa = Empresa.objects.create(nombre='Empresa de prueba')

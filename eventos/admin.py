@@ -41,6 +41,6 @@ class OfertaLaboralAdmin(admin.ModelAdmin):
 class PostulacionAdmin(admin.ModelAdmin):
 	list_display = ('oferta', 'postulante', 'fecha_postulacion', 'estado')
 	list_filter = ('estado', 'fecha_postulacion')
-	search_fields = ('oferta__titulo', 'postulante__usuario__nombre', 'postulante__usuario__usuario')
+	search_fields = ('oferta__titulo', 'postulante__nombre_completo')
 	autocomplete_fields = ('oferta', 'postulante')
-	list_select_related = ('oferta', 'postulante', 'postulante__usuario')
+	list_select_related = ('oferta', 'postulante')

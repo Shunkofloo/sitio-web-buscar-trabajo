@@ -2,19 +2,12 @@ from datetime import datetime
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
-from django.contrib.auth.hashers import check_password
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
-
-from .decorators import login_requerido
-from .models import UsuarioSitio
 
 
 def login_view(request):
-    if request.user.is_authenticated and request.user.is_staff:
-        return redirect('admin:index')
-
-    # Si ya inicio sesion, lo mandamos directo al perfil.
-    if request.session.get('usuario_autenticado'):
+    if request.user.is_authenticated:
         return redirect('usuarios_perfil')
 
     error = None
@@ -28,23 +21,15 @@ def login_view(request):
             username=nombre_usuario,
             password=password,
         )
-        if usuario_django is not None and usuario_django.is_staff:
+        if usuario_django is not None:
             auth_login(request, usuario_django)
-            messages.success(request, f'Bienvenido/a, {usuario_django.username}.')
-            return redirect('admin:index')
-
-        usuario = UsuarioSitio.objects.filter(usuario__iexact=nombre_usuario).first()
-
-        if usuario is not None and usuario.rol == 'administrador':
-            error = 'Para ingresar al panel usa una cuenta creada con createsuperuser.'
-        elif usuario is not None and check_password(password, usuario.password):
-            request.session['usuario_autenticado'] = usuario.usuario
-            request.session['nombre_usuario'] = usuario.nombre
-            request.session['rol_usuario'] = usuario.rol
-            messages.success(request, f"Bienvenido/a, {usuario.nombre}!")
+            messages.success(
+                request,
+                f'Bienvenido/a, {usuario_django.get_full_name() or usuario_django.username}.',
+            )
             return redirect('usuarios_perfil')
-        else:
-            error = "Usuario o contrasena incorrectos."
+
+        error = "Usuario o contrasena incorrectos."
 
     contexto = {'error': error}
     return render(request, 'usuarios/login.html', contexto)
@@ -56,12 +41,14 @@ def logout_view(request):
     return redirect('usuarios_login')
 
 
-@login_requerido
+@login_required
 def perfil_view(request):
+    usuario = request.user
+    rol = usuario.groups.order_by('name').values_list('name', flat=True).first()
     contexto = {
-        'nombre_usuario': request.session.get('nombre_usuario'),
-        'usuario': request.session.get('usuario_autenticado'),
-        'rol_usuario': request.session.get('rol_usuario'),
+        'nombre_usuario': usuario.get_full_name() or usuario.username,
+        'usuario': usuario.username,
+        'rol_usuario': rol or 'Sin rol asignado',
         'fecha_actual': datetime.now().strftime('%d-%m-%Y %H:%M'),
     }
     return render(request, 'usuarios/perfil.html', contexto)

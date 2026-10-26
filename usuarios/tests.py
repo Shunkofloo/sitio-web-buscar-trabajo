@@ -1,66 +1,54 @@
 from django.test import TestCase
-from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import make_password
 
-from .models import PerfilPostulante, UsuarioSitio
+from .models import PerfilPostulante
 
 
-class LoginUsuarioSitioTests(TestCase):
+class AutenticacionDjangoTests(TestCase):
 	def setUp(self):
-		self.usuario = UsuarioSitio.objects.create(
-			usuario='estudiante',
-			password=make_password('clave-segura'),
-			nombre='Estudiante de prueba',
-			rol='invitado',
+		self.usuario = get_user_model().objects.create_user(
+			username='estudiante',
+			password='clave-segura',
+			first_name='Estudiante de prueba',
 		)
 
-	def test_login_consulta_usuario_en_base_de_datos(self):
+	def test_login_autentica_usuario_de_django(self):
 		response = self.client.post('/usuarios/login/', {
-			'usuario': 'ESTUDIANTE',
+			'usuario': 'estudiante',
 			'password': 'clave-segura',
 		})
 
 		self.assertRedirects(response, '/usuarios/perfil/')
-		self.assertEqual(
-			self.client.session['usuario_autenticado'],
-			self.usuario.usuario,
-		)
+		self.assertIn('_auth_user_id', self.client.session)
 
-	def test_usuario_esta_registrado_en_admin(self):
-		self.assertIn(UsuarioSitio, admin.site._registry)
+	def test_perfil_requiere_autenticacion_django(self):
+		response = self.client.get('/usuarios/perfil/')
 
-	def test_perfil_postulante_esta_registrado_en_admin(self):
-		self.assertIn(PerfilPostulante, admin.site._registry)
+		self.assertRedirects(response, '/usuarios/login/?next=/usuarios/perfil/')
 
-	def test_superusuario_ingresa_desde_el_login_del_sitio_al_admin(self):
-		administrador = get_user_model().objects.create_superuser(
-			username='superadmin',
-			email='superadmin@example.com',
-			password='clave-admin-segura',
-		)
+	def test_perfil_muestra_usuario_y_grupo_de_django(self):
+		self.client.force_login(self.usuario)
+		self.usuario.groups.create(name='Supervisor')
 
-		response = self.client.post('/usuarios/login/', {
-			'usuario': administrador.username,
-			'password': 'clave-admin-segura',
-		})
-
-		self.assertRedirects(response, '/admin/')
-		self.assertEqual(self.client.get('/admin/').status_code, 200)
-
-	def test_rol_administrador_del_sitio_no_es_superusuario_django(self):
-		usuario_admin_sitio = UsuarioSitio.objects.create(
-			usuario='admin_portal',
-			password=make_password('clave-portal'),
-			nombre='Administrador del portal',
-			rol='administrador',
-		)
-
-		response = self.client.post('/usuarios/login/', {
-			'usuario': usuario_admin_sitio.usuario,
-			'password': 'clave-portal',
-		})
+		response = self.client.get('/usuarios/perfil/')
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'cuenta creada con createsuperuser')
-		self.assertNotIn('usuario_autenticado', self.client.session)
+		self.assertEqual(response.context['nombre_usuario'], 'Estudiante de prueba')
+		self.assertEqual(response.context['usuario'], 'estudiante')
+		self.assertEqual(response.context['rol_usuario'], 'Supervisor')
+
+
+class PerfilPostulanteTests(TestCase):
+	def test_perfil_es_independiente_del_usuario_de_autenticacion(self):
+		perfil = PerfilPostulante.objects.create(
+			nombre_completo='Candidata de prueba',
+			correo='candidata@example.com',
+			telefono='+56 9 1234 5678',
+			profesion='Desarrolladora',
+			resumen_profesional='Experiencia en desarrollo web.',
+			habilidades='Python, Django',
+			curriculum_url='https://example.com/cv',
+		)
+
+		self.assertEqual(str(perfil), 'Candidata de prueba')
+		self.assertNotIn('usuario', {field.name for field in PerfilPostulante._meta.fields})
