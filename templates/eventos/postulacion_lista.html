@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Postulaciones{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1 class="display-6 fw-bold mb-2">Postulaciones</h1>
+    <p class="mb-0">Consulta las postulaciones registradas y su estado.</p>
+</section>
+
+<form class="row g-2 align-items-end my-4" method="get">
+    <div class="col-md-4">
+        <label class="form-label" for="filtro-estado-postulacion">Estado</label>
+        <select class="form-select" id="filtro-estado-postulacion" name="estado">
+            <option value="">Todos</option>
+            {% for valor, etiqueta in estados %}
+                <option value="{{ valor }}" {% if filtro_estado == valor %}selected{% endif %}>{{ etiqueta }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-5">
+        <label class="form-label" for="filtro-oferta-postulacion">Oferta</label>
+        <select class="form-select" id="filtro-oferta-postulacion" name="oferta">
+            <option value="">Todas</option>
+            {% for oferta in ofertas %}
+                <option value="{{ oferta.pk }}" {% if filtro_oferta == oferta.pk|stringformat:'s' %}selected{% endif %}>{{ oferta.titulo }} · {{ oferta.empresa.nombre }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+        <button class="btn btn-outline-primary" type="submit">Filtrar</button>
+        {% if perms.eventos.add_postulacion %}
+            <a class="btn btn-primary" href="{% url 'postulacion_crear' %}">Registrar</a>
+        {% endif %}
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr><th>Candidato</th><th>Correo</th><th>Oferta</th><th>Fecha</th><th>Estado</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for postulacion in postulaciones %}
+                <tr>
+                    <td>{{ postulacion.postulante.nombre_completo }}</td>
+                    <td>{{ postulacion.postulante.correo }}</td>
+                    <td>{{ postulacion.oferta.titulo }} · {{ postulacion.oferta.empresa.nombre }}</td>
+                    <td>{{ postulacion.fecha_postulacion|date:'d/m/Y H:i' }}</td>
+                    <td>{{ postulacion.get_estado_display }}</td>
+                    <td><a class="btn btn-sm btn-outline-primary" href="{% url 'postulacion_detalle' postulacion.pk %}">Ver detalle</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="text-center py-4">No se encontraron postulaciones.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if is_paginated %}
+    <nav aria-label="Paginación de postulaciones">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?estado={{ filtro_estado|urlencode }}&oferta={{ filtro_oferta|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a></li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?estado={{ filtro_estado|urlencode }}&oferta={{ filtro_oferta|urlencode }}&page={{ page_obj.next_page_number }}">Siguiente</a></li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endif %}
+{% endblock %}

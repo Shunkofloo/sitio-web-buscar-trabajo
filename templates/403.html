@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block title %}Acceso denegado{% endblock %}
+{% block content %}
+<section class="page-header text-center">
+    <div class="container">
+        <h1 class="display-6 fw-bold mb-2">Acceso denegado</h1>
+        <p class="mb-0">Tu cuenta no tiene permisos para acceder a esta página.</p>
+    </div>
+</section>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="alert alert-warning text-center" role="alert">
+            <p class="mb-3">Si crees que deberías tener acceso, contacta al administrador del sitio.</p>
+            <a href="{% url 'eventos_inicio' %}" class="btn btn-primary">Volver al inicio</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

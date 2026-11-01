@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Gestión de empresas{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1 class="display-6 fw-bold mb-2">Gestión de empresas</h1>
+    <p class="mb-0">Administra las empresas registradas en el portal.</p>
+</section>
+
+<form class="row g-2 align-items-end my-4" method="get" role="search">
+    <div class="col-md-6">
+        <label class="form-label" for="buscar-empresa">Buscar</label>
+        <input class="form-control" id="buscar-empresa" name="q" value="{{ query }}" placeholder="Nombre, ubicación o correo">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label" for="filtro-activa">Estado</label>
+        <select class="form-select" id="filtro-activa" name="activa">
+            <option value="" {% if not filtro_activa %}selected{% endif %}>Todas</option>
+            <option value="true" {% if filtro_activa == 'true' %}selected{% endif %}>Activas</option>
+            <option value="false" {% if filtro_activa == 'false' %}selected{% endif %}>Inactivas</option>
+        </select>
+    </div>
+    <div class="col-md-3 d-flex gap-2">
+        <button class="btn btn-outline-primary" type="submit">Buscar</button>
+        {% if perms.eventos.add_empresa %}
+            <a class="btn btn-primary" href="{% url 'empresa_crear' %}">Agregar empresa</a>
+        {% endif %}
+    </div>
+</form>
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr><th>Nombre</th><th>Ubicación</th><th>Correo</th><th>Sitio web</th><th>Estado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody>
+            {% for empresa in empresas %}
+                <tr>
+                    <td>{{ empresa.nombre }}</td>
+                    <td>{{ empresa.ubicacion|default:'—' }}</td>
+                    <td>{{ empresa.correo_contacto|default:'—' }}</td>
+                    <td>{% if empresa.sitio_web %}<a href="{{ empresa.sitio_web }}" target="_blank" rel="noopener">{{ empresa.sitio_web }}</a>{% else %}—{% endif %}</td>
+                    <td>{% if empresa.activa %}Activa{% else %}Inactiva{% endif %}</td>
+                    <td class="text-nowrap">
+                        {% if perms.eventos.change_empresa %}
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'empresa_editar' empresa.pk %}">Editar</a>
+                        {% endif %}
+                        {% if perms.eventos.delete_empresa %}
+                            <a class="btn btn-sm btn-outline-danger" href="{% url 'empresa_eliminar' empresa.pk %}">Eliminar</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="text-center py-4">No se encontraron empresas.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if is_paginated %}
+    <nav aria-label="Paginación de empresas">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&activa={{ filtro_activa }}&page={{ page_obj.previous_page_number }}">Anterior</a></li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&activa={{ filtro_activa }}&page={{ page_obj.next_page_number }}">Siguiente</a></li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Gestión de usuarios{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1 class="display-6 fw-bold mb-2">Gestión de usuarios</h1>
+    <p class="mb-0">Busca usuarios y administra sus datos y grupos.</p>
+</section>
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 my-4">
+    <form class="d-flex gap-2" method="get" role="search">
+        <label class="visually-hidden" for="buscar-usuario">Buscar usuarios</label>
+        <input class="form-control" id="buscar-usuario" name="q" value="{{ query }}" placeholder="Usuario, nombre o correo">
+        <button class="btn btn-outline-primary" type="submit">Buscar</button>
+    </form>
+    {% if perms.auth.add_user %}
+        <a class="btn btn-primary" href="{% url 'usuario_crear' %}">Crear usuario</a>
+    {% endif %}
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped align-middle">
+        <thead>
+            <tr><th>Usuario</th><th>Nombre</th><th>Correo</th><th>Grupo</th><th>Estado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody>
+            {% for usuario in usuarios %}
+                <tr>
+                    <td>{{ usuario.username }}</td>
+                    <td>{{ usuario.get_full_name|default:'—' }}</td>
+                    <td>{{ usuario.email }}</td>
+                    <td>{% for grupo in usuario.groups.all %}{{ grupo.name }}{% if not forloop.last %}, {% endif %}{% empty %}Sin grupo{% endfor %}</td>
+                    <td>{% if usuario.is_active %}Activo{% else %}Inactivo{% endif %}</td>
+                    <td class="text-nowrap">
+                        {% if perms.auth.change_user %}
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'usuario_editar' usuario.pk %}">Editar</a>
+                        {% endif %}
+                        {% if perms.auth.delete_user %}
+                            <a class="btn btn-sm btn-outline-danger" href="{% url 'usuario_eliminar' usuario.pk %}">Eliminar</a>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="text-center py-4">No se encontraron usuarios.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if is_paginated %}
+    <nav aria-label="Paginación de usuarios">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&page={{ page_obj.previous_page_number }}">Anterior</a></li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+            {% endif %}
+            <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+            {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?q={{ query|urlencode }}&page={{ page_obj.next_page_number }}">Siguiente</a></li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+            {% endif %}
+        </ul>
+    </nav>
+{% endif %}
+{% endblock %}

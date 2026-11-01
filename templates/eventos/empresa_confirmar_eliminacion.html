@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Eliminar empresa{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1 class="display-6 fw-bold mb-2">Eliminar empresa</h1>
+    <p class="mb-0">Confirma la eliminación de la empresa.</p>
+</section>
+
+<div class="row justify-content-center my-4">
+    <div class="col-lg-7">
+        <div class="section-card p-4">
+            <p>¿Seguro que deseas eliminar <strong>{{ empresa.nombre }}</strong>?</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                <a class="btn btn-outline-secondary" href="{% url 'empresa_lista' %}">Cancelar</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

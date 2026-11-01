@@ -19,12 +19,37 @@
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
                     <li class="nav-item"><a class="nav-link" href="{% url 'ofertas_lista' %}">Vacantes</a></li>
                     <li class="nav-item"><a class="nav-link" href="{% url 'noticias_inicio' %}">Noticias</a></li>
-                    {% if request.user.is_authenticated and request.user.is_staff %}
-                        <li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}">Administración</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'usuarios_logout' %}">👤 {{ request.user.username }} · Cerrar sesión</a></li>
-                    {% elif request.session.usuario_autenticado %}
-                        <li class="nav-item"><a class="nav-link" href="{% url 'usuarios_perfil' %}">👤 {{ request.session.nombre_usuario }}</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'usuarios_logout' %}">Cerrar sesión</a></li>
+                    {% if request.user.is_authenticated %}
+                        {% if perms.eventos.view_empresa %}
+                            {% url 'empresa_lista' as empresa_lista_url %}
+                            {% if empresa_lista_url %}
+                                <li class="nav-item"><a class="nav-link" href="{{ empresa_lista_url }}">Empresas</a></li>
+                            {% endif %}
+                        {% endif %}
+                        {% if perms.eventos.view_ofertalaboral %}
+                            <li class="nav-item"><a class="nav-link" href="{% url 'oferta_lista' %}">Gestión de ofertas</a></li>
+                        {% endif %}
+                        {% if perms.eventos.view_postulacion %}
+                            {% url 'postulacion_lista' as postulacion_lista_url %}
+                            {% if postulacion_lista_url %}
+                                <li class="nav-item"><a class="nav-link" href="{{ postulacion_lista_url }}">Postulaciones</a></li>
+                            {% endif %}
+                        {% endif %}
+                        {% if perms.auth.view_user %}
+                            <li class="nav-item"><a class="nav-link" href="{% url 'usuario_lista' %}">Gestión de usuarios</a></li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <span class="navbar-text px-2">👤 {{ request.user.get_full_name|default:request.user.username }} · {{ nombre_grupo_usuario }}</span>
+                        </li>
+                        {% if dashboard_usuario_url %}
+                            <li class="nav-item"><a class="nav-link" href="{{ dashboard_usuario_url }}">Mi dashboard</a></li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <form method="post" action="{% url 'usuarios_logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-link nav-link">Cerrar sesión</button>
+                            </form>
+                        </li>
                     {% else %}
                         <li class="nav-item"><a class="nav-link" href="{% url 'usuarios_login' %}">Iniciar sesión</a></li>
                     {% endif %}
@@ -36,7 +61,7 @@
     <main class="container my-4">
         {% if messages %}
             {% for message in messages %}
-                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
                 </div>

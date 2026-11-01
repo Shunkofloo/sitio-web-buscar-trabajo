@@ -8,7 +8,7 @@
 
 <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between my-4">
     {% if perms.eventos.add_ofertalaboral %}
-    <a class="btn btn-primary" href="{% url 'admin:eventos_ofertalaboral_add' %}">Agregar oferta</a>
+        <a class="btn btn-primary" href="{% url 'oferta_crear' %}">Agregar oferta</a>
     {% endif %}
     <form class="d-flex gap-2" method="get" role="search">
         <label class="visually-hidden" for="buscar-oferta">Buscar vacantes</label>
@@ -41,6 +41,9 @@
             </p>
             {% endif %}
             <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                {% if perms.eventos.add_postulacion %}
+                    <a class="btn btn-primary" href="{% url 'postulacion_crear' %}?oferta={{ oferta.pk }}">Registrar postulación</a>
+                {% endif %}
                 {% if oferta.empresa.correo_contacto %}
                 <a class="btn btn-primary" href="mailto:{{ oferta.empresa.correo_contacto }}?subject=Postulación%20{{ oferta.titulo|urlencode }}">Contactar empresa</a>
                 {% endif %}
@@ -48,10 +51,10 @@
                 <a class="btn btn-outline-secondary" href="{{ oferta.empresa.sitio_web }}" target="_blank" rel="noopener">Sitio de la empresa</a>
                 {% endif %}
                 {% if perms.eventos.change_ofertalaboral %}
-                <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'admin:eventos_ofertalaboral_change' oferta.pk %}">Modificar</a>
+                    <a class="btn btn-sm btn-outline-secondary ms-auto" href="{% url 'oferta_editar' oferta.pk %}">Modificar</a>
                 {% endif %}
                 {% if perms.eventos.delete_ofertalaboral %}
-                <a class="btn btn-sm btn-outline-danger" href="{% url 'admin:eventos_ofertalaboral_delete' oferta.pk %}">Eliminar</a>
+                    <a class="btn btn-sm btn-outline-danger" href="{% url 'oferta_eliminar' oferta.pk %}">Eliminar</a>
                 {% endif %}
             </div>
         </article>

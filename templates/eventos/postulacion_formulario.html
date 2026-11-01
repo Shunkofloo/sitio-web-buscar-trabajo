@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Registrar postulación{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1 class="display-6 fw-bold mb-2">Registrar postulación</h1>
+    <p class="mb-0">Ingresa los datos del candidato y selecciona una oferta publicada y vigente.</p>
+</section>
+
+<form method="post" class="card card-body my-4">
+    {% csrf_token %}
+    {% for field in form %}
+        <div class="mb-3">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+            {% for error in field.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+        </div>
+    {% endfor %}
+    {% for error in form.non_field_errors %}
+        <div class="alert alert-danger">{{ error }}</div>
+    {% endfor %}
+    <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-primary" type="submit">Registrar postulación</button>
+        <a class="btn btn-outline-secondary" href="{% url 'ofertas_lista' %}">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

@@ -17,7 +17,10 @@
                 <li class="list-group-item"><strong>Rol:</strong> {{ rol_usuario }}</li>
                 <li class="list-group-item"><strong>Fecha y hora de acceso:</strong> {{ fecha_actual }}</li>
             </ul>
-            <a href="{% url 'usuarios_logout' %}" class="btn btn-outline-danger">Cerrar sesión</a>
+            <form method="post" action="{% url 'usuarios_logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger">Cerrar sesión</button>
+            </form>
         </div>
     </div>
 </div>

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}{% if object %}Editar usuario{% else %}Crear usuario{% endif %}{% endblock %}
+{% block content %}
+<section class="page-header">
+    <h1 class="display-6 fw-bold mb-2">{% if object %}Editar usuario{% else %}Crear usuario{% endif %}</h1>
+    <p class="mb-0">Completa los datos de la cuenta y asigna un grupo.</p>
+</section>
+
+<div class="row justify-content-center my-4">
+    <div class="col-lg-8">
+        <div class="section-card p-4">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {% for error in form.non_field_errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+                    </div>
+                {% endif %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        {% if field.field.widget.input_type == 'checkbox' %}
+                            <div class="form-check">
+                                {{ field }}
+                                <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            </div>
+                        {% else %}
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                        {% endif %}
+                        {% if field.help_text %}<div class="form-text">{{ field.help_text|safe }}</div>{% endif %}
+                        {% for error in field.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                    <a class="btn btn-outline-secondary" href="{% url 'usuario_lista' %}">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
