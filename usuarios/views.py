@@ -1,32 +1,110 @@
+import secrets
+import smtplib
+from datetime import timedelta
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.views import (
-	LoginView,
-	LogoutView,
-	PasswordResetCompleteView,
-	PasswordResetConfirmView,
-	PasswordResetDoneView,
-	PasswordResetView,
-)
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.hashers import check_password, make_password
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.views import LoginView, LogoutView
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.mail import send_mail
 from django.db.models import Q
+from django.db import transaction
 from django.shortcuts import redirect, render
-from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DeleteView, ListView, UpdateView
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import timezone
+from django.views import View
+from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
 from .forms import (
+	FormularioCodigoYContrasena,
 	FormularioCrearUsuario,
 	FormularioEditarUsuario,
 	FormularioInicioSesion,
 	FormularioRecuperarContrasena,
-	FormularioRestablecerContrasena,
+	FormularioRegistroPublico,
 )
 from .mixins import LoginYPermisoRequeridoMixin
+from .models import CodigoVerificacion, PerfilPostulante
 from .roles import obtener_dashboard_usuario
 
 
 User = get_user_model()
+CODIGO_DURACION_MINUTOS = 10
+CODIGO_MAX_INTENTOS = 5
+
+
+class ErrorEntregaCorreo(Exception):
+	pass
+
+
+class CodigoReenvioReciente(Exception):
+	pass
+
+
+def _crear_y_enviar_codigo(usuario, proposito):
+	ahora = timezone.now()
+	codigos_recientes = CodigoVerificacion.objects.filter(
+		usuario=usuario,
+		proposito=proposito,
+		creado_en__gte=ahora - timedelta(hours=1),
+	)
+	if (
+		codigos_recientes.count() >= 5
+		or codigos_recientes.filter(
+			creado_en__gte=ahora - timedelta(seconds=60),
+		).exists()
+	):
+		raise CodigoReenvioReciente
+
+	codigo = f'{secrets.randbelow(9000) + 1000}'
+	CodigoVerificacion.objects.filter(
+		usuario=usuario,
+		proposito=proposito,
+		usado_en__isnull=True,
+	).update(usado_en=timezone.now())
+	CodigoVerificacion.objects.create(
+		usuario=usuario,
+		proposito=proposito,
+		codigo_hash=make_password(codigo),
+		expira_en=ahora + timedelta(minutes=CODIGO_DURACION_MINUTOS),
+	)
+	es_registro = proposito == CodigoVerificacion.Proposito.REGISTRO
+	asunto = (
+		'Verifica tu correo para crear tu cuenta'
+		if es_registro
+		else 'Código para recuperar tu contraseña'
+	)
+	mensaje = render_to_string('usuarios/codigo_verificacion_email.txt', {
+		'nombre': usuario.first_name or usuario.username,
+		'codigo': codigo,
+		'es_registro': es_registro,
+		'duracion_minutos': CODIGO_DURACION_MINUTOS,
+	})
+	if send_mail(asunto, mensaje, None, [usuario.email], fail_silently=False) != 1:
+		raise ErrorEntregaCorreo
+
+
+def _render_codigo_formulario(request, form, proposito, status=200):
+	es_registro = proposito == CodigoVerificacion.Proposito.REGISTRO
+	return render(
+		request,
+		'usuarios/codigo_form.html',
+		{
+			'form': form,
+			'es_registro': es_registro,
+			'url_reintentar': (
+				reverse('usuarios_registro')
+				if es_registro
+				else reverse('usuarios_password_reset')
+			),
+		},
+		status=status,
+	)
 
 
 class RedireccionDespuesGestionMixin:
@@ -46,25 +124,196 @@ class CerrarSesionView(LogoutView):
 	pass
 
 
-class RecuperarContrasenaView(PasswordResetView):
+class RecuperarContrasenaView(View):
 	template_name = 'usuarios/password_reset_form.html'
-	email_template_name = 'usuarios/password_reset_email.html'
-	subject_template_name = 'usuarios/password_reset_subject.txt'
-	form_class = FormularioRecuperarContrasena
-	success_url = reverse_lazy('usuarios_password_reset_done')
+
+	def get(self, request, *args, **kwargs):
+		return render(request, self.template_name, {'form': FormularioRecuperarContrasena()})
+
+	def post(self, request, *args, **kwargs):
+		form = FormularioRecuperarContrasena(request.POST)
+		if not form.is_valid():
+			return render(request, self.template_name, {'form': form})
+		usuario = User.objects.filter(
+			email__iexact=form.cleaned_data['email'],
+			is_active=True,
+		).order_by('pk').first()
+		if usuario:
+			try:
+				with transaction.atomic():
+					_crear_y_enviar_codigo(
+						usuario,
+						CodigoVerificacion.Proposito.RECUPERACION,
+					)
+			except CodigoReenvioReciente:
+				form.add_error(
+					None,
+					'Ya enviamos un código hace poco. Espera un minuto antes de solicitar otro.',
+				)
+				return render(request, self.template_name, {'form': form}, status=429)
+			except (ErrorEntregaCorreo, OSError, smtplib.SMTPException):
+				form.add_error(
+					None,
+					'No pudimos enviar el código. Inténtalo más tarde o contacta al administrador.',
+				)
+				return render(request, self.template_name, {'form': form}, status=503)
+		return redirect('usuarios_password_reset_done')
 
 
-class RecuperarContrasenaEnviadaView(PasswordResetDoneView):
+class RecuperarContrasenaEnviadaView(TemplateView):
 	template_name = 'usuarios/password_reset_done.html'
 
 
-class ConfirmarRestablecimientoContrasenaView(PasswordResetConfirmView):
-	template_name = 'usuarios/password_reset_confirm.html'
-	form_class = FormularioRestablecerContrasena
-	success_url = reverse_lazy('usuarios_password_reset_complete')
+class RegistroPublicoView(View):
+	template_name = 'usuarios/registro.html'
+
+	def get(self, request, *args, **kwargs):
+		return render(request, self.template_name, {'form': FormularioRegistroPublico()})
+
+	def post(self, request, *args, **kwargs):
+		form = FormularioRegistroPublico(request.POST)
+		if not form.is_valid():
+			return render(request, self.template_name, {'form': form})
+
+		datos = form.cleaned_data
+		try:
+			with transaction.atomic():
+				usuario_existente = User.objects.filter(
+					Q(email__iexact=datos['email'])
+					| Q(username__iexact=datos['email']),
+					is_active=False,
+					is_staff=False,
+					is_superuser=False,
+					groups__isnull=True,
+				).order_by('pk').first()
+				if usuario_existente:
+					usuario = usuario_existente
+					usuario.first_name = datos['nombre_completo']
+					usuario.save(update_fields=['first_name'])
+					perfil = PerfilPostulante.objects.filter(
+						correo__iexact=datos['email'],
+					).order_by('pk').first()
+					if perfil is None:
+						perfil = PerfilPostulante(
+							nombre_completo=datos['nombre_completo'],
+							correo=datos['email'],
+						)
+				else:
+					usuario = User.objects.create_user(
+						username=datos['email'],
+						email=datos['email'],
+						first_name=datos['nombre_completo'],
+						is_active=False,
+					)
+					perfil = PerfilPostulante.objects.filter(
+						correo__iexact=datos['email'],
+					).order_by('pk').first()
+					if perfil is None:
+						perfil = PerfilPostulante(
+							nombre_completo=datos['nombre_completo'],
+							correo=datos['email'],
+						)
+				perfil.nombre_completo = datos['nombre_completo']
+				perfil.correo = datos['email']
+				perfil.region = datos['region']
+				perfil.comuna = datos['comuna']
+				perfil.tiene_experiencia = datos['tiene_experiencia']
+				perfil.experiencia = datos['experiencia']
+				perfil.save()
+				_crear_y_enviar_codigo(
+					usuario,
+					CodigoVerificacion.Proposito.REGISTRO,
+				)
+		except CodigoReenvioReciente:
+			form.add_error(
+				None,
+				'Ya enviamos un código hace poco. Espera un minuto antes de solicitar otro.',
+			)
+			return render(request, self.template_name, {'form': form}, status=429)
+		except (ErrorEntregaCorreo, OSError, smtplib.SMTPException):
+			form.add_error(
+				None,
+				'No pudimos enviar el código de verificación. Inténtalo más tarde.',
+			)
+			return render(request, self.template_name, {'form': form}, status=503)
+
+		return redirect(
+			f'{reverse("usuarios_registro_confirmar")}?'
+			f'{urlencode({"email": datos["email"]})}'
+		)
 
 
-class RestablecimientoContrasenaCompletoView(PasswordResetCompleteView):
+class ConfirmarCodigoView(View):
+	proposito = None
+
+	def get(self, request, *args, **kwargs):
+		form = FormularioCodigoYContrasena(initial={
+			'email': request.GET.get('email', '').strip().lower(),
+		})
+		return _render_codigo_formulario(request, form, self.proposito)
+
+	def post(self, request, *args, **kwargs):
+		form = FormularioCodigoYContrasena(request.POST)
+		if not form.is_valid():
+			return _render_codigo_formulario(request, form, self.proposito)
+
+		datos = form.cleaned_data
+		with transaction.atomic():
+			codigo = CodigoVerificacion.objects.select_for_update().filter(
+				usuario__email__iexact=datos['email'],
+				proposito=self.proposito,
+				usado_en__isnull=True,
+				expira_en__gt=timezone.now(),
+				intentos__lt=CODIGO_MAX_INTENTOS,
+			).order_by('-creado_en').first()
+			if codigo is None:
+				form.add_error(
+					'codigo',
+					'El código no es válido o expiró. Solicita uno nuevo para continuar.',
+				)
+				return _render_codigo_formulario(request, form, self.proposito)
+			if not check_password(datos['codigo'], codigo.codigo_hash):
+				codigo.intentos += 1
+				codigo.save(update_fields=['intentos'])
+				form.add_error(
+					'codigo',
+					'El código es incorrecto. Después de 5 intentos tendrás que solicitar otro.',
+				)
+				return _render_codigo_formulario(request, form, self.proposito)
+
+			usuario = codigo.usuario
+			try:
+				validate_password(datos['password1'], user=usuario)
+			except ValidationError as error:
+				form.add_error('password1', error)
+				return _render_codigo_formulario(request, form, self.proposito)
+
+			usuario.set_password(datos['password1'])
+			es_registro = self.proposito == CodigoVerificacion.Proposito.REGISTRO
+			if es_registro:
+				usuario.is_active = True
+				mensaje = 'Correo verificado. Ya puedes iniciar sesión con tu correo y contraseña.'
+			else:
+				mensaje = 'Tu contraseña se cambió correctamente. Ya puedes iniciar sesión.'
+			usuario.save(update_fields=['password', 'is_active'])
+			codigo.usado_en = timezone.now()
+			codigo.save(update_fields=['usado_en'])
+
+		if es_registro:
+			messages.success(request, mensaje)
+			return redirect('usuarios_login')
+		return redirect('usuarios_password_reset_complete')
+
+
+class ConfirmarRegistroView(ConfirmarCodigoView):
+	proposito = CodigoVerificacion.Proposito.REGISTRO
+
+
+class ConfirmarRecuperacionView(ConfirmarCodigoView):
+	proposito = CodigoVerificacion.Proposito.RECUPERACION
+
+
+class RestablecimientoContrasenaCompletoView(TemplateView):
 	template_name = 'usuarios/password_reset_complete.html'
 
 

@@ -1,3 +1,5 @@
+import re
+from datetime import timedelta
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -6,10 +8,11 @@ from django.core import mail
 from django.core.management import call_command, CommandError
 from django.urls import reverse
 from django.test import override_settings
+from django.utils import timezone
 from io import StringIO
 from unittest.mock import patch
 
-from .models import PerfilPostulante
+from .models import CodigoVerificacion, PerfilPostulante
 from .mixins import LoginYPermisoRequeridoMixin, grupo_principal
 
 
@@ -150,7 +153,15 @@ class RecuperacionContrasenaTests(TestCase):
 			password='Clave-inicial-segura-934!',
 		)
 
-	def test_solicitud_existente_envia_un_correo_con_enlace_de_restablecimiento(self):
+	@staticmethod
+	def codigo_enviado():
+		return next(
+			line.strip()
+			for line in mail.outbox[0].body.splitlines()
+			if re.fullmatch(r'\d{4}', line.strip())
+		)
+
+	def test_solicitud_existente_envia_un_codigo_de_cuatro_digitos(self):
 		response = self.client.post(
 			reverse('usuarios_password_reset'),
 			{'email': self.usuario.email},
@@ -159,31 +170,23 @@ class RecuperacionContrasenaTests(TestCase):
 		self.assertRedirects(response, reverse('usuarios_password_reset_done'))
 		self.assertEqual(len(mail.outbox), 1)
 		self.assertEqual(mail.outbox[0].to, [self.usuario.email])
-		self.assertIn('Restablece la contraseña', mail.outbox[0].subject)
-		self.assertIn('/usuarios/restablecer/', mail.outbox[0].body)
+		self.assertIn('Código', mail.outbox[0].subject)
+		self.assertRegex(self.codigo_enviado(), r'^\d{4}$')
 
-	def test_enlace_abre_formulario_y_restablece_password_permitiendo_login(self):
+	def test_codigo_restablece_contrasena_y_permite_login(self):
 		self.client.post(
 			reverse('usuarios_password_reset'),
 			{'email': self.usuario.email},
 		)
-		enlace = next(
-			line.strip()
-			for line in mail.outbox[0].body.splitlines()
-			if '/usuarios/restablecer/' in line
-		)
-		ruta = enlace.removeprefix('http://testserver')
-
-		response = self.client.get(ruta, follow=True)
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Crear nueva contraseña')
 
 		nueva_contrasena = 'Nueva-clave-segura-237!'
 		response = self.client.post(
-			response.request['PATH_INFO'],
+			reverse('usuarios_password_reset_confirm'),
 			{
-				'new_password1': nueva_contrasena,
-				'new_password2': nueva_contrasena,
+				'email': self.usuario.email,
+				'codigo': self.codigo_enviado(),
+				'password1': nueva_contrasena,
+				'password2': nueva_contrasena,
 			},
 			follow=True,
 		)
@@ -205,17 +208,97 @@ class RecuperacionContrasenaTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertIn('_auth_user_id', self.client.session)
 
-	def test_token_invalido_muestra_instrucciones_claras(self):
+	def test_codigo_incorrecto_suma_un_intento(self):
+		self.client.post(
+			reverse('usuarios_password_reset'),
+			{'email': self.usuario.email},
+		)
+		codigo_correcto = self.codigo_enviado()
+		codigo_incorrecto = f'{(int(codigo_correcto) + 1) % 10000:04d}'
 		response = self.client.get(
-			reverse(
-				'usuarios_password_reset_confirm',
-				kwargs={'uidb64': 'invalid', 'token': 'invalid-token'},
-			)
+			reverse('usuarios_password_reset_confirm'),
+		)
+		self.assertContains(response, 'Código de 4 dígitos')
+		response = self.client.post(
+			reverse('usuarios_password_reset_confirm'),
+			{
+				'email': self.usuario.email,
+				'codigo': codigo_incorrecto,
+				'password1': 'Nueva-clave-segura-237!',
+				'password2': 'Nueva-clave-segura-237!',
+			},
 		)
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'El enlace para restablecer la contraseña no es válido o ya expiró.')
-		self.assertContains(response, 'Solicitar otro enlace')
+		self.assertContains(response, 'El código es incorrecto.')
+		codigo = self.usuario.codigos_verificacion.get()
+		self.assertEqual(codigo.intentos, 1)
+
+	def test_codigo_expirado_no_permite_cambiar_contrasena(self):
+		self.client.post(
+			reverse('usuarios_password_reset'),
+			{'email': self.usuario.email},
+		)
+		CodigoVerificacion.objects.filter(usuario=self.usuario).update(
+			expira_en=timezone.now() - timedelta(seconds=1),
+		)
+
+		response = self.client.post(
+			reverse('usuarios_password_reset_confirm'),
+			{
+				'email': self.usuario.email,
+				'codigo': self.codigo_enviado(),
+				'password1': 'Nueva-clave-segura-237!',
+				'password2': 'Nueva-clave-segura-237!',
+			},
+		)
+
+		self.assertContains(response, 'El código no es válido o expiró.')
+		self.usuario.refresh_from_db()
+		self.assertTrue(self.usuario.check_password('Clave-inicial-segura-934!'))
+
+	def test_codigo_se_bloquea_despues_de_cinco_intentos(self):
+		self.client.post(
+			reverse('usuarios_password_reset'),
+			{'email': self.usuario.email},
+		)
+		codigo_correcto = self.codigo_enviado()
+		codigo_incorrecto = f'{(int(codigo_correcto) + 1) % 10000:04d}'
+		datos = {
+			'email': self.usuario.email,
+			'codigo': codigo_incorrecto,
+			'password1': 'Nueva-clave-segura-237!',
+			'password2': 'Nueva-clave-segura-237!',
+		}
+
+		for _ in range(5):
+			response = self.client.post(
+				reverse('usuarios_password_reset_confirm'),
+				datos,
+			)
+
+		self.assertEqual(self.usuario.codigos_verificacion.get().intentos, 5)
+		response = self.client.post(
+			reverse('usuarios_password_reset_confirm'),
+			datos,
+		)
+		self.assertContains(response, 'El código no es válido o expiró.')
+		self.assertEqual(self.usuario.codigos_verificacion.get().intentos, 5)
+
+	def test_no_permite_reenviar_codigos_en_menos_de_un_minuto(self):
+		self.client.post(
+			reverse('usuarios_password_reset'),
+			{'email': self.usuario.email},
+		)
+
+		response = self.client.post(
+			reverse('usuarios_password_reset'),
+			{'email': self.usuario.email},
+		)
+
+		self.assertEqual(response.status_code, 429)
+		self.assertContains(response, 'Espera un minuto', status_code=429)
+		self.assertEqual(len(mail.outbox), 1)
 
 	def test_solicitud_con_correo_desconocido_no_revela_si_existe(self):
 		response = self.client.post(
@@ -226,6 +309,107 @@ class RecuperacionContrasenaTests(TestCase):
 
 		self.assertContains(response, 'Si existe una cuenta activa con ese correo')
 		self.assertEqual(len(mail.outbox), 0)
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class RegistroPublicoTests(TestCase):
+	@staticmethod
+	def codigo_enviado():
+		return next(
+			line.strip()
+			for line in mail.outbox[0].body.splitlines()
+			if re.fullmatch(r'\d{4}', line.strip())
+		)
+
+	def datos_registro(self, **cambios):
+		datos = {
+			'nombre_completo': 'Candidata de prueba',
+			'email': 'candidata@example.com',
+			'comuna': 'La Serena',
+			'tiene_experiencia': '',
+			'experiencia': '',
+		}
+		datos.update(cambios)
+		return datos
+
+	def test_formulario_registro_aparece_junto_a_recuperacion(self):
+		response = self.client.get(reverse('usuarios_login'))
+
+		self.assertContains(response, 'Crear usuario')
+		self.assertContains(response, '¿Olvidaste tu contraseña?')
+
+	def test_registro_verifica_correo_guarda_perfil_y_crea_contrasena(self):
+		response = self.client.post(
+			reverse('usuarios_registro'),
+			self.datos_registro(),
+		)
+
+		self.assertRedirects(
+			response,
+			f'{reverse("usuarios_registro_confirmar")}?email=candidata%40example.com',
+		)
+		usuario = get_user_model().objects.get(username='candidata@example.com')
+		self.assertFalse(usuario.is_active)
+		self.assertFalse(usuario.has_usable_password())
+		perfil = PerfilPostulante.objects.get(correo='candidata@example.com')
+		self.assertEqual(perfil.region, 'Región de Coquimbo')
+		self.assertEqual(perfil.comuna, 'La Serena')
+		self.assertFalse(perfil.tiene_experiencia)
+		self.assertEqual(mail.outbox[0].to, ['candidata@example.com'])
+
+		contrasena = 'Contrasena-segura-934!'
+		response = self.client.post(
+			reverse('usuarios_registro_confirmar'),
+			{
+				'email': usuario.email,
+				'codigo': self.codigo_enviado(),
+				'password1': contrasena,
+				'password2': contrasena,
+			},
+			follow=True,
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Correo verificado.')
+		usuario.refresh_from_db()
+		self.assertTrue(usuario.is_active)
+		self.assertTrue(usuario.check_password(contrasena))
+		self.assertTrue(
+			usuario.codigos_verificacion.filter(usado_en__isnull=False).exists(),
+		)
+
+	def test_registro_solicita_experiencia_cuando_se_indica_que_si(self):
+		response = self.client.post(
+			reverse('usuarios_registro'),
+			self.datos_registro(
+				comuna='Copiapó',
+				tiene_experiencia='on',
+			),
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Cuéntanos brevemente tu experiencia laboral.')
+		self.assertFalse(get_user_model().objects.filter(email='candidata@example.com').exists())
+
+	def test_registro_guarda_experiencia_y_comuna_segun_region(self):
+		response = self.client.post(
+			reverse('usuarios_registro'),
+			self.datos_registro(
+				comuna='Santiago',
+				tiene_experiencia='on',
+				experiencia='Dos años en atención al cliente.',
+			),
+		)
+
+		self.assertRedirects(
+			response,
+			f'{reverse("usuarios_registro_confirmar")}?email=candidata%40example.com',
+		)
+		perfil = PerfilPostulante.objects.get(correo='candidata@example.com')
+		self.assertEqual(perfil.region, 'Región Metropolitana de Santiago')
+		self.assertEqual(perfil.comuna, 'Santiago')
+		self.assertTrue(perfil.tiene_experiencia)
+		self.assertEqual(perfil.experiencia, 'Dos años en atención al cliente.')
 
 
 class PerfilPostulanteTests(TestCase):

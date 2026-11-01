@@ -3,15 +3,28 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import (
 	AuthenticationForm,
 	PasswordResetForm,
-	SetPasswordForm,
 	UserCreationForm,
 )
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
+from django.db.models import Q
+
+from .models import PerfilPostulante
 
 
 User = get_user_model()
 GRUPOS_DISPONIBLES = ('Administrador', 'Supervisor', 'Administrativo')
+COMUNAS_POR_REGION = {
+	'Región de Coquimbo': ('La Serena', 'Coquimbo'),
+	'Región de Atacama': ('Copiapó',),
+	'Región Metropolitana de Santiago': ('Santiago',),
+}
+REGIONES_POR_COMUNA = {
+	comuna: region
+	for region, comunas in COMUNAS_POR_REGION.items()
+	for comuna in comunas
+}
 
 
 class FormularioBootstrapMixin:
@@ -128,7 +141,7 @@ class FormularioInicioSesion(AuthenticationForm):
 		self.fields['username'].widget.attrs.update({
 			'class': 'form-control',
 			'autofocus': True,
-			'placeholder': 'Nombre de usuario',
+			'placeholder': 'Correo electrónico o usuario',
 		})
 		self.fields['password'].widget.attrs.update({
 			'class': 'form-control',
@@ -146,9 +159,104 @@ class FormularioRecuperarContrasena(FormularioBootstrapMixin, PasswordResetForm)
 		})
 
 
-class FormularioRestablecerContrasena(FormularioBootstrapMixin, SetPasswordForm):
+class FormularioRegistroPublico(FormularioBootstrapMixin, forms.Form):
+	nombre_completo = forms.CharField(label='Nombre', max_length=150)
+	email = forms.EmailField(label='Correo electrónico')
+	comuna = forms.ChoiceField(
+		label='Región y comuna',
+		choices=[
+			('', 'Selecciona tu comuna'),
+			*[
+				(region, [(comuna, comuna) for comuna in comunas])
+				for region, comunas in COMUNAS_POR_REGION.items()
+			],
+		],
+	)
+	tiene_experiencia = forms.BooleanField(
+		label='¿Tienes experiencia laboral?',
+		required=False,
+	)
+	experiencia = forms.CharField(
+		label='Cuéntanos tu experiencia',
+		required=False,
+		widget=forms.Textarea(attrs={'rows': 4}),
+	)
+
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.fields['new_password1'].label = 'Nueva contraseña'
-		self.fields['new_password2'].label = 'Confirmar nueva contraseña'
 		self.aplicar_clases_bootstrap()
+
+	def clean_nombre_completo(self):
+		return self.cleaned_data['nombre_completo'].strip()
+
+	def clean_email(self):
+		email = self.cleaned_data['email'].strip().lower()
+		usuario = User.objects.filter(
+			Q(email__iexact=email) | Q(username__iexact=email),
+		).order_by('pk').first()
+		if usuario and (
+			usuario.is_active
+			or usuario.is_staff
+			or usuario.is_superuser
+			or usuario.groups.exists()
+			or usuario.has_usable_password()
+			or not PerfilPostulante.objects.filter(correo__iexact=email).exists()
+		):
+			raise ValidationError('Ya existe una cuenta registrada con ese correo.')
+		return email
+
+	def clean(self):
+		datos = super().clean()
+		comuna = datos.get('comuna')
+		if comuna:
+			datos['region'] = REGIONES_POR_COMUNA[comuna]
+		if datos.get('tiene_experiencia'):
+			experiencia = (datos.get('experiencia') or '').strip()
+			if not experiencia:
+				self.add_error(
+					'experiencia',
+					'Cuéntanos brevemente tu experiencia laboral.',
+				)
+			datos['experiencia'] = experiencia
+		else:
+			datos['experiencia'] = ''
+		return datos
+
+
+class FormularioCodigoYContrasena(FormularioBootstrapMixin, forms.Form):
+	email = forms.EmailField(label='Correo electrónico')
+	codigo = forms.CharField(
+		label='Código de 4 dígitos',
+		max_length=4,
+		validators=[RegexValidator(r'^\d{4}$', 'Ingresa los 4 dígitos del código.')],
+		widget=forms.TextInput(attrs={
+			'autocomplete': 'one-time-code',
+			'inputmode': 'numeric',
+			'maxlength': '4',
+		}),
+	)
+	password1 = forms.CharField(
+		label='Nueva contraseña',
+		widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+	)
+	password2 = forms.CharField(
+		label='Confirmar contraseña',
+		widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+	)
+
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.aplicar_clases_bootstrap()
+
+	def clean_email(self):
+		return self.cleaned_data['email'].strip().lower()
+
+	def clean(self):
+		datos = super().clean()
+		if (
+			datos.get('password1')
+			and datos.get('password2')
+			and datos['password1'] != datos['password2']
+		):
+			self.add_error('password2', 'Las contraseñas no coinciden.')
+		return datos

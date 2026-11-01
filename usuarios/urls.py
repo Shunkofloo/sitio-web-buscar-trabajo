@@ -3,9 +3,11 @@ from django.urls import path
 from .views import (
 	IniciarSesionView,
 	CerrarSesionView,
-	ConfirmarRestablecimientoContrasenaView,
+	ConfirmarRecuperacionView,
+	ConfirmarRegistroView,
 	RecuperarContrasenaEnviadaView,
 	RecuperarContrasenaView,
+	RegistroPublicoView,
 	RestablecimientoContrasenaCompletoView,
 	UsuarioCrearView,
 	UsuarioEditarView,
@@ -20,6 +22,12 @@ from .views import (
 urlpatterns = [
 	path('login/', IniciarSesionView.as_view(), name='usuarios_login'),
 	path('logout/', CerrarSesionView.as_view(), name='usuarios_logout'),
+	path('registro/', RegistroPublicoView.as_view(), name='usuarios_registro'),
+	path(
+		'registro/codigo/',
+		ConfirmarRegistroView.as_view(),
+		name='usuarios_registro_confirmar',
+	),
 	path('recuperar/', RecuperarContrasenaView.as_view(), name='usuarios_password_reset'),
 	path(
 		'recuperar/enviado/',
@@ -27,8 +35,8 @@ urlpatterns = [
 		name='usuarios_password_reset_done',
 	),
 	path(
-		'restablecer/<uidb64>/<token>/',
-		ConfirmarRestablecimientoContrasenaView.as_view(),
+		'recuperar/codigo/',
+		ConfirmarRecuperacionView.as_view(),
 		name='usuarios_password_reset_confirm',
 	),
 	path(

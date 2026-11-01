@@ -55,7 +55,9 @@ python manage.py runserver
 
 Abre `http://127.0.0.1:8000/`. El comando `crear_roles` es idempotente para grupos y usuarios demo; sincroniza los permisos y grupos, y establece la contraseña de los usuarios demo a partir de `DEMO_PASSWORD` cada vez que se ejecuta. No uses cuentas demo en producción.
 
-Para que la recuperación de contraseña funcione fuera de pruebas, configura el correo SMTP en `.env`. El backend predeterminado es la consola, que imprime los mensajes en la terminal y no los envía por Internet.
+El enlace **Crear usuario** permite registrar nombre, correo, comuna y experiencia laboral. El correo se usa como nombre de usuario. Para completar el registro, la persona verifica su dirección con un código de 4 dígitos y define su contraseña. La recuperación de contraseña usa el mismo tipo de código; vence a los 10 minutos y se bloquea después de 5 intentos incorrectos.
+
+Para recibir los códigos por correo fuera de pruebas, configura SMTP en `.env` con las variables `EMAIL_*`. El backend predeterminado es la consola, que imprime el mensaje en la terminal y no lo envía por Internet; resulta útil para desarrollo local.
 
 ## Variables de entorno
 
@@ -71,7 +73,7 @@ Para que la recuperación de contraseña funcione fuera de pruebas, configura el
 | `DB_USER`, `DB_PASSWORD` | Credenciales de la base MySQL. |
 | `DB_HOST`, `DB_PORT` | Host y puerto de MySQL. |
 | `DEMO_PASSWORD` | Contraseña exigida por `python manage.py crear_roles`; nunca incluir una contraseña real en el repositorio. |
-| `EMAIL_BACKEND` | Backend de correo; por defecto usa la consola de Django. |
+| `EMAIL_BACKEND` | Backend de correo; usa `django.core.mail.backends.smtp.EmailBackend` para enviar por SMTP. Por defecto usa la consola. |
 | `EMAIL_HOST`, `EMAIL_PORT` | Servidor SMTP y puerto. |
 | `EMAIL_USE_TLS` | Indica si SMTP usa TLS. |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | Credenciales SMTP. |
@@ -100,7 +102,7 @@ El conjunto de pruebas cubre autenticación, permisos, mantenedores, postulacion
    ```
 
 4. Configura un archivo `.env` fuera del control de versiones. Define una `SECRET_KEY` larga y privada, `DEBUG=False`, el dominio/IP en `ALLOWED_HOSTS`, y los valores `DB_*` adecuados. Para MySQL, crea previamente una base y un usuario con privilegios limitados para esa base. No reutilices las credenciales de ejemplo.
-5. Configura el correo SMTP mediante las variables `EMAIL_*` si la aplicación debe enviar recuperación de contraseña. Mantén privados los datos de acceso SMTP.
+5. Configura un servidor SMTP mediante las variables `EMAIL_*`; se necesita para enviar los códigos de verificación del registro y de recuperación de contraseña. Mantén privados los datos de acceso SMTP.
 6. Aplica migraciones, crea/sincroniza grupos y usuarios demo con una contraseña segura mediante `DEMO_PASSWORD`, y recopila los estáticos:
 
    ```bash

@@ -1,0 +1,7 @@
+Hola {{ nombre }},
+
+{% if es_registro %}Usa este código para verificar tu correo y crear tu cuenta:{% else %}Usa este código para restablecer la contraseña de tu cuenta:{% endif %}
+
+{{ codigo }}
+
+El código vence en {{ duracion_minutos }} minutos. Si no solicitaste este código, puedes ignorar este mensaje.

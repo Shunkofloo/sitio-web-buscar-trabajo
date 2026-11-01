@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Crear usuario{% endblock %}
+{% block content %}
+<section class="page-header text-center">
+    <h1 class="display-6 fw-bold mb-2">Crear usuario</h1>
+    <p class="mb-0">Registra tus datos y verifica tu correo para crear una contraseña.</p>
+</section>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <form method="post" class="card card-body my-4" novalidate>
+            {% csrf_token %}
+            {% for error in form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">{{ error }}</div>
+            {% endfor %}
+
+            {% for field in form %}
+                {% if field.name == 'experiencia' %}
+                    <div class="mb-3" id="experiencia-container" {% if not form.tiene_experiencia.value %}hidden{% endif %}>
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="mb-3">
+                        {% if field.name == 'tiene_experiencia' %}
+                            <div class="form-check">
+                                {{ field }}
+                                <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            </div>
+                        {% else %}
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+
+            <button class="btn btn-primary" type="submit">Enviar código al correo</button>
+            <a class="btn btn-link mt-2" href="{% url 'usuarios_login' %}">Volver a iniciar sesión</a>
+        </form>
+    </div>
+</div>
+<script>
+    const experienciaCheck = document.getElementById('{{ form.tiene_experiencia.id_for_label }}');
+    const experienciaContainer = document.getElementById('experiencia-container');
+    experienciaCheck.addEventListener('change', () => {
+        experienciaContainer.hidden = !experienciaCheck.checked;
+    });
+</script>
+{% endblock %}

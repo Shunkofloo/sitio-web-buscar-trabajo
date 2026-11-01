@@ -24,7 +24,7 @@
             <form method="post" novalidate>
                 {% csrf_token %}
                 <div class="mb-3">
-                    <label for="{{ form.username.id_for_label }}" class="form-label">Usuario</label>
+                    <label for="{{ form.username.id_for_label }}" class="form-label">Correo electrónico o usuario</label>
                     {{ form.username }}
                     {% for error in form.username.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
                 </div>
@@ -35,9 +35,10 @@
                 </div>
                 <button type="submit" class="btn btn-primary w-100 btn-lg">Ingresar</button>
             </form>
-            <p class="text-center mt-3 mb-0">
+            <div class="d-flex justify-content-center gap-3 mt-3">
                 <a href="{% url 'usuarios_password_reset' %}">¿Olvidaste tu contraseña?</a>
-            </p>
+                <a href="{% url 'usuarios_registro' %}">Crear usuario</a>
+            </div>
         </div>
     </div>
 </div>
