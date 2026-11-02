@@ -4,4 +4,6 @@ Hola {{ nombre }},
 
 {{ codigo }}
 
-El código vence en {{ duracion_minutos }} minutos. Si no solicitaste este código, puedes ignorar este mensaje.
+El código vence en {{ duracion_minutos }} minutos y solo se puede usar una vez.{% if not es_registro %} No lo compartas con nadie: nuestro equipo nunca te lo pedirá.{% endif %}
+
+Si no solicitaste este código, puedes ignorar este mensaje; tu contraseña no cambiará.

@@ -23,7 +23,7 @@ El acceso de edición o eliminación se controla en el servidor mediante permiso
 - Listado de postulaciones con filtros por estado y oferta, página de detalle y cambio de estado autorizado.
 - Inicio y cierre de sesión con el sistema de autenticación de Django y redirección al dashboard del grupo.
 - Gestión de usuarios: búsqueda, paginación, altas, edición, asignación de grupo y activación/desactivación.
-- Recuperación de contraseña por correo, con enlaces seguros de duración limitada.
+- Recuperación de contraseña con código de 6 dígitos enviado por correo (Amazon SES), de un solo uso y con vigencia configurable. Ver `GUIA_AWS_SES.md`.
 - Mensajes y formularios Bootstrap en español.
 
 ## Requisitos
@@ -55,9 +55,9 @@ python manage.py runserver
 
 Abre `http://127.0.0.1:8000/`. El comando `crear_roles` es idempotente para grupos y usuarios demo; sincroniza los permisos y grupos, y establece la contraseña de los usuarios demo a partir de `DEMO_PASSWORD` cada vez que se ejecuta. No uses cuentas demo en producción.
 
-El enlace **Crear usuario** permite registrar nombre, correo, comuna y experiencia laboral. El correo se usa como nombre de usuario. Para completar el registro, la persona verifica su dirección con un código de 4 dígitos, ingresado en cuatro casillas, y define su contraseña. La recuperación de contraseña envía un enlace con el token seguro de Django para restablecerla.
+El enlace **Crear usuario** permite registrar nombre, correo, comuna y experiencia laboral. El correo se usa como nombre de usuario. Para completar el registro, la persona verifica su dirección con un código de 4 dígitos, ingresado en cuatro casillas, y define su contraseña. La recuperación envía un código de 6 dígitos que se ingresa junto con la nueva contraseña en `/usuarios/recuperar/codigo/`.
 
-Para recibir los códigos de registro y los enlaces de recuperación por correo fuera de pruebas, configura SMTP en `.env` con las variables `EMAIL_*`. El backend predeterminado es la consola, que imprime el mensaje en la terminal y no lo envía por Internet; resulta útil para desarrollo local.
+Para recibir los códigos de registro y recuperación por correo fuera de pruebas, configura SMTP en `.env` con las variables `EMAIL_*`; con Amazon SES, sigue `GUIA_AWS_SES.md`. El backend predeterminado es la consola, que imprime el mensaje en la terminal y no lo envía por Internet; resulta útil para desarrollo local.
 
 ## Variables de entorno
 
@@ -77,7 +77,9 @@ Para recibir los códigos de registro y los enlaces de recuperación por correo 
 | `EMAIL_HOST`, `EMAIL_PORT` | Servidor SMTP y puerto. |
 | `EMAIL_USE_TLS` | Indica si SMTP usa TLS. |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` | Credenciales SMTP. |
-| `DEFAULT_FROM_EMAIL` | Dirección remitente de los correos de la aplicación. |
+| `DEFAULT_FROM_EMAIL` | Dirección remitente de los correos; con SES debe estar verificada. |
+| `EMAIL_TIMEOUT` | Segundos de espera máxima al servidor SMTP (10 por defecto). |
+| `CODIGO_DURACION_MINUTOS` | Vigencia de los códigos enviados por correo (15 por defecto). |
 
 ## Pruebas y verificaciones
 
@@ -102,7 +104,7 @@ El conjunto de pruebas cubre autenticación, permisos, mantenedores, postulacion
    ```
 
 4. Configura un archivo `.env` fuera del control de versiones. Define una `SECRET_KEY` larga y privada, `DEBUG=False`, el dominio/IP en `ALLOWED_HOSTS`, y los valores `DB_*` adecuados. Para MySQL, crea previamente una base y un usuario con privilegios limitados para esa base. No reutilices las credenciales de ejemplo.
-5. Configura un servidor SMTP mediante las variables `EMAIL_*`; se necesita para enviar los códigos de verificación del registro y de recuperación de contraseña. Mantén privados los datos de acceso SMTP.
+5. Configura Amazon SES (o otro servidor SMTP) mediante las variables `EMAIL_*`; se necesita para enviar los códigos de verificación del registro y de recuperación de contraseña. La cuenta SES debe salir del sandbox para enviar a cualquier destinatario. Pasos detallados en `GUIA_AWS_SES.md`. Mantén privados los datos de acceso SMTP.
 6. Aplica migraciones, crea/sincroniza grupos y usuarios demo con una contraseña segura mediante `DEMO_PASSWORD`, y recopila los estáticos:
 
    ```bash

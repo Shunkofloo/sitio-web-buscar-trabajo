@@ -5,7 +5,7 @@
     <h1 class="display-6 fw-bold mb-2">
         {% if es_registro %}Verifica tu correo{% else %}Restablecer contraseña{% endif %}
     </h1>
-    <p class="mb-0">Ingresa el código de 4 dígitos que enviamos a tu correo y crea una contraseña.</p>
+    <p class="mb-0">Ingresa el código de {{ longitud }} dígitos que enviamos a tu correo y crea una {% if es_registro %}contraseña{% else %}nueva contraseña{% endif %}.</p>
 </section>
 
 <div class="row justify-content-center">
@@ -19,8 +19,8 @@
                 <div class="mb-3">
                     {% if field.name == 'codigo' %}
                         <label class="form-label d-block" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                        <div class="d-flex gap-2 mb-2" role="group" aria-label="Código de verificación de cuatro dígitos">
-                            {% for digit in '1234' %}
+                        <div class="d-flex gap-2 mb-2" role="group" aria-label="Código de verificación de {{ longitud }} dígitos">
+                            {% for digit in digitos %}
                                 <input
                                     class="form-control text-center fs-4 fw-bold"
                                     style="width: 3.5rem; height: 3.75rem;"
@@ -46,8 +46,8 @@
                     {% endfor %}
                 </div>
             {% endfor %}
-            <p class="form-text">El código vence en 10 minutos y se bloquea después de 5 intentos incorrectos.</p>
-            <button class="btn btn-primary" type="submit">Verificar y guardar contraseña</button>
+            <p class="form-text">El código vence en {{ duracion_minutos }} minutos y se bloquea después de {{ max_intentos }} intentos incorrectos.</p>
+            <button class="btn btn-primary" type="submit">{% if es_registro %}Verificar y guardar contraseña{% else %}Cambiar contraseña{% endif %}</button>
             <a class="btn btn-link mt-2" href="{{ url_reintentar }}">Solicitar otro código</a>
         </form>
     </div>
@@ -76,7 +76,7 @@
             }
         });
         input.addEventListener('paste', event => {
-            const digits = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+            const digits = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, codeInputs.length);
             if (!digits) return;
             event.preventDefault();
             digits.split('').forEach((digit, digitIndex) => {

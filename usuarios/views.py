@@ -1,28 +1,23 @@
+import logging
 import secrets
 import smtplib
 from datetime import timedelta
 from urllib.parse import urlencode
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.views import (
-	LoginView,
-	LogoutView,
-	PasswordResetCompleteView,
-	PasswordResetConfirmView,
-	PasswordResetDoneView,
-	PasswordResetView,
-)
+from django.contrib.auth.views import LoginView, LogoutView
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.db.models import Q
 from django.db import transaction
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
@@ -34,16 +29,19 @@ from .forms import (
 	FormularioInicioSesion,
 	FormularioRecuperarContrasena,
 	FormularioRegistroPublico,
-	FormularioRestablecerContrasena,
 )
 from .mixins import LoginYPermisoRequeridoMixin
 from .models import CodigoVerificacion, PerfilPostulante
 from .roles import obtener_dashboard_usuario
 
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
-CODIGO_DURACION_MINUTOS = 10
 CODIGO_MAX_INTENTOS = 5
+LONGITUD_CODIGO = {
+	CodigoVerificacion.Proposito.REGISTRO: 4,
+	CodigoVerificacion.Proposito.RECUPERACION: 6,
+}
 
 
 class ErrorEntregaCorreo(Exception):
@@ -69,7 +67,9 @@ def _crear_y_enviar_codigo(usuario, proposito):
 	):
 		raise CodigoReenvioReciente
 
-	codigo = f'{secrets.randbelow(9000) + 1000}'
+	longitud = LONGITUD_CODIGO[proposito]
+	duracion_minutos = settings.CODIGO_DURACION_MINUTOS
+	codigo = f'{secrets.randbelow(10 ** longitud):0{longitud}d}'
 	CodigoVerificacion.objects.filter(
 		usuario=usuario,
 		proposito=proposito,
@@ -79,7 +79,7 @@ def _crear_y_enviar_codigo(usuario, proposito):
 		usuario=usuario,
 		proposito=proposito,
 		codigo_hash=make_password(codigo),
-		expira_en=ahora + timedelta(minutes=CODIGO_DURACION_MINUTOS),
+		expira_en=ahora + timedelta(minutes=duracion_minutos),
 	)
 	es_registro = proposito == CodigoVerificacion.Proposito.REGISTRO
 	asunto = (
@@ -91,20 +91,39 @@ def _crear_y_enviar_codigo(usuario, proposito):
 		'nombre': usuario.first_name or usuario.username,
 		'codigo': codigo,
 		'es_registro': es_registro,
-		'duracion_minutos': CODIGO_DURACION_MINUTOS,
+		'duracion_minutos': duracion_minutos,
 	})
-	if send_mail(asunto, mensaje, None, [usuario.email], fail_silently=False) != 1:
+	try:
+		enviados = send_mail(asunto, mensaje, None, [usuario.email], fail_silently=False)
+	except (smtplib.SMTPException, OSError, UnicodeError) as error:
+		logger.exception(
+			'No se pudo enviar el código de %s al usuario %s.',
+			proposito,
+			usuario.pk,
+		)
+		raise ErrorEntregaCorreo from error
+	if enviados != 1:
+		logger.error(
+			'El backend no confirmó el envío del código de %s al usuario %s.',
+			proposito,
+			usuario.pk,
+		)
 		raise ErrorEntregaCorreo
 
 
 def _render_codigo_formulario(request, form, proposito, status=200):
 	es_registro = proposito == CodigoVerificacion.Proposito.REGISTRO
+	longitud = LONGITUD_CODIGO[proposito]
 	return render(
 		request,
 		'usuarios/codigo_form.html',
 		{
 			'form': form,
 			'es_registro': es_registro,
+			'longitud': longitud,
+			'digitos': range(longitud),
+			'duracion_minutos': settings.CODIGO_DURACION_MINUTOS,
+			'max_intentos': CODIGO_MAX_INTENTOS,
 			'url_reintentar': (
 				reverse('usuarios_registro')
 				if es_registro
@@ -132,17 +151,50 @@ class CerrarSesionView(LogoutView):
 	pass
 
 
-class RecuperarContrasenaView(PasswordResetView):
+class RecuperarContrasenaView(View):
+	"""Paso 1: pide el correo y envía un código de un solo uso."""
+
 	template_name = 'usuarios/password_reset_form.html'
-	email_template_name = 'usuarios/password_reset_email.html'
-	html_email_template_name = 'usuarios/password_reset_email_html.html'
-	subject_template_name = 'usuarios/password_reset_subject.txt'
-	form_class = FormularioRecuperarContrasena
-	success_url = reverse_lazy('usuarios_password_reset_done')
 
+	def get(self, request, *args, **kwargs):
+		return render(request, self.template_name, {'form': FormularioRecuperarContrasena()})
 
-class RecuperarContrasenaEnviadaView(PasswordResetDoneView):
-	template_name = 'usuarios/password_reset_done.html'
+	def post(self, request, *args, **kwargs):
+		form = FormularioRecuperarContrasena(request.POST)
+		if not form.is_valid():
+			return render(request, self.template_name, {'form': form})
+
+		email = form.cleaned_data['email']
+		usuario = User.objects.filter(
+			email__iexact=email,
+			is_active=True,
+		).order_by('pk').first()
+		if usuario is not None:
+			try:
+				with transaction.atomic():
+					_crear_y_enviar_codigo(
+						usuario,
+						CodigoVerificacion.Proposito.RECUPERACION,
+					)
+			except CodigoReenvioReciente:
+				# Conserva el código vigente y mantiene la respuesta genérica.
+				pass
+			except ErrorEntregaCorreo:
+				form.add_error(
+					None,
+					'No pudimos enviar el código. Inténtalo de nuevo más tarde.',
+				)
+				return render(request, self.template_name, {'form': form}, status=503)
+
+		messages.info(
+			request,
+			'Si existe una cuenta activa con ese correo, te enviamos un código. '
+			'Revisa tu bandeja de entrada y la carpeta de spam.',
+		)
+		return redirect(
+			f'{reverse("usuarios_password_reset_codigo")}?'
+			f'{urlencode({"email": email})}'
+		)
 
 
 class RegistroPublicoView(View):
@@ -211,7 +263,7 @@ class RegistroPublicoView(View):
 				'Ya enviamos un código hace poco. Espera un minuto antes de solicitar otro.',
 			)
 			return render(request, self.template_name, {'form': form}, status=429)
-		except (ErrorEntregaCorreo, OSError, smtplib.SMTPException):
+		except (ErrorEntregaCorreo, OSError, UnicodeError, smtplib.SMTPException):
 			form.add_error(
 				None,
 				'No pudimos enviar el código de verificación. Inténtalo más tarde.',
@@ -228,25 +280,32 @@ class ConfirmarCodigoView(View):
 	proposito = None
 
 	def get(self, request, *args, **kwargs):
-		form = FormularioCodigoYContrasena(initial={
-			'email': request.GET.get('email', '').strip().lower(),
-		})
+		form = FormularioCodigoYContrasena(
+			initial={'email': request.GET.get('email', '').strip().lower()},
+			longitud=LONGITUD_CODIGO[self.proposito],
+		)
 		return _render_codigo_formulario(request, form, self.proposito)
 
 	def post(self, request, *args, **kwargs):
-		form = FormularioCodigoYContrasena(request.POST)
+		form = FormularioCodigoYContrasena(
+			request.POST,
+			longitud=LONGITUD_CODIGO[self.proposito],
+		)
 		if not form.is_valid():
 			return _render_codigo_formulario(request, form, self.proposito)
 
 		datos = form.cleaned_data
 		with transaction.atomic():
-			codigo = CodigoVerificacion.objects.select_for_update().filter(
+			codigos = CodigoVerificacion.objects.select_for_update().filter(
 				usuario__email__iexact=datos['email'],
 				proposito=self.proposito,
 				usado_en__isnull=True,
 				expira_en__gt=timezone.now(),
 				intentos__lt=CODIGO_MAX_INTENTOS,
-			).order_by('-creado_en').first()
+			)
+			if self.proposito == CodigoVerificacion.Proposito.RECUPERACION:
+				codigos = codigos.filter(usuario__is_active=True)
+			codigo = codigos.order_by('-creado_en').first()
 			if codigo is None:
 				form.add_error(
 					'codigo',
@@ -258,7 +317,7 @@ class ConfirmarCodigoView(View):
 				codigo.save(update_fields=['intentos'])
 				form.add_error(
 					'codigo',
-					'El código es incorrecto. Después de 5 intentos tendrás que solicitar otro.',
+					f'El código es incorrecto. Después de {CODIGO_MAX_INTENTOS} intentos tendrás que solicitar otro.',
 				)
 				return _render_codigo_formulario(request, form, self.proposito)
 
@@ -290,13 +349,13 @@ class ConfirmarRegistroView(ConfirmarCodigoView):
 	proposito = CodigoVerificacion.Proposito.REGISTRO
 
 
-class ConfirmarRestablecimientoContrasenaView(PasswordResetConfirmView):
-	template_name = 'usuarios/password_reset_confirm.html'
-	form_class = FormularioRestablecerContrasena
-	success_url = reverse_lazy('usuarios_password_reset_complete')
+class ConfirmarRecuperacionView(ConfirmarCodigoView):
+	"""Paso 2: valida el código recibido por correo y guarda la nueva contraseña."""
+
+	proposito = CodigoVerificacion.Proposito.RECUPERACION
 
 
-class RestablecimientoContrasenaCompletoView(PasswordResetCompleteView):
+class RestablecimientoContrasenaCompletoView(TemplateView):
 	template_name = 'usuarios/password_reset_complete.html'
 
 

@@ -1,11 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import (
-	AuthenticationForm,
-	PasswordResetForm,
-	SetPasswordForm,
-	UserCreationForm,
-)
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -150,22 +145,18 @@ class FormularioInicioSesion(AuthenticationForm):
 		})
 
 
-class FormularioRecuperarContrasena(FormularioBootstrapMixin, PasswordResetForm):
+class FormularioRecuperarContrasena(FormularioBootstrapMixin, forms.Form):
+	email = forms.EmailField(
+		label='Correo electrónico',
+		widget=forms.EmailInput(attrs={'autocomplete': 'email', 'autofocus': True}),
+	)
+
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.fields['email'].label = 'Correo electrónico'
-		self.fields['email'].widget.attrs.update({
-			'class': 'form-control',
-			'autocomplete': 'email',
-		})
-
-
-class FormularioRestablecerContrasena(FormularioBootstrapMixin, SetPasswordForm):
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.fields['new_password1'].label = 'Nueva contraseña'
-		self.fields['new_password2'].label = 'Confirmar nueva contraseña'
 		self.aplicar_clases_bootstrap()
+
+	def clean_email(self):
+		return self.cleaned_data['email'].strip().lower()
 
 
 class FormularioRegistroPublico(FormularioBootstrapMixin, forms.Form):
@@ -234,16 +225,7 @@ class FormularioRegistroPublico(FormularioBootstrapMixin, forms.Form):
 
 class FormularioCodigoYContrasena(FormularioBootstrapMixin, forms.Form):
 	email = forms.EmailField(label='Correo electrónico')
-	codigo = forms.CharField(
-		label='Código de 4 dígitos',
-		max_length=4,
-		validators=[RegexValidator(r'^\d{4}$', 'Ingresa los 4 dígitos del código.')],
-		widget=forms.TextInput(attrs={
-			'autocomplete': 'one-time-code',
-			'inputmode': 'numeric',
-			'maxlength': '4',
-		}),
-	)
+	codigo = forms.CharField(label='Código')
 	password1 = forms.CharField(
 		label='Nueva contraseña',
 		widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
@@ -253,8 +235,21 @@ class FormularioCodigoYContrasena(FormularioBootstrapMixin, forms.Form):
 		widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
 	)
 
-	def __init__(self, *args, **kwargs):
+	def __init__(self, *args, longitud=4, **kwargs):
 		super().__init__(*args, **kwargs)
+		self.fields['codigo'] = forms.CharField(
+			label=f'Código de {longitud} dígitos',
+			max_length=longitud,
+			validators=[RegexValidator(
+				rf'^\d{{{longitud}}}$',
+				f'Ingresa los {longitud} dígitos del código.',
+			)],
+			widget=forms.TextInput(attrs={
+				'autocomplete': 'one-time-code',
+				'inputmode': 'numeric',
+				'maxlength': str(longitud),
+			}),
+		)
 		self.aplicar_clases_bootstrap()
 
 	def clean_email(self):

@@ -1,12 +1,16 @@
 import re
+import smtplib
+from datetime import timedelta
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.models import Group, Permission
 from django.core import mail
 from django.core.management import call_command, CommandError
 from django.urls import reverse
 from django.test import override_settings
+from django.utils import timezone
 from io import StringIO
 from unittest.mock import patch
 
@@ -142,8 +146,13 @@ class AutenticacionDjangoTests(TestCase):
 		self.assertIsNone(grupo_principal(self.usuario))
 
 
-@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+@override_settings(
+	EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+	CODIGO_DURACION_MINUTOS=15,
+)
 class RecuperacionContrasenaTests(TestCase):
+	NUEVA_CONTRASENA = 'Nueva-clave-segura-237!'
+
 	def setUp(self):
 		self.usuario = get_user_model().objects.create_user(
 			username='recuperacion',
@@ -151,85 +160,244 @@ class RecuperacionContrasenaTests(TestCase):
 			password='Clave-inicial-segura-934!',
 		)
 
-	def test_solicitud_existente_envia_enlace_seguro(self):
-		response = self.client.post(
+	def solicitar_codigo(self, email=None):
+		return self.client.post(
 			reverse('usuarios_password_reset'),
-			{'email': self.usuario.email},
+			{'email': email or self.usuario.email},
 		)
 
-		self.assertRedirects(response, reverse('usuarios_password_reset_done'))
+	@staticmethod
+	def codigo_enviado(indice=0):
+		return next(
+			line.strip()
+			for line in mail.outbox[indice].body.splitlines()
+			if re.fullmatch(r'\d{6}', line.strip())
+		)
+
+	def confirmar(self, codigo, contrasena=None, email=None):
+		contrasena = contrasena or self.NUEVA_CONTRASENA
+		return self.client.post(
+			reverse('usuarios_password_reset_codigo'),
+			{
+				'email': email or self.usuario.email,
+				'codigo': codigo,
+				'password1': contrasena,
+				'password2': contrasena,
+			},
+		)
+
+	def test_solicitud_existente_envia_codigo_de_seis_digitos(self):
+		response = self.solicitar_codigo()
+
+		self.assertRedirects(
+			response,
+			f'{reverse("usuarios_password_reset_codigo")}?email=recuperacion%40example.com',
+		)
 		self.assertEqual(len(mail.outbox), 1)
 		self.assertEqual(mail.outbox[0].to, [self.usuario.email])
-		self.assertIn('enlace seguro', mail.outbox[0].subject.lower())
-		self.assertIn('/usuarios/restablecer/', mail.outbox[0].body)
-		self.assertEqual(len(mail.outbox[0].alternatives), 1)
-		html = mail.outbox[0].alternatives[0][0]
-		self.assertIn('Recuperar contraseña', html)
-		self.assertIn('/usuarios/restablecer/', html)
+		self.assertIn('código', mail.outbox[0].subject.lower())
+		self.assertRegex(self.codigo_enviado(), r'^\d{6}$')
+		self.assertIn('15 minutos', mail.outbox[0].body)
+		self.assertNotIn('/usuarios/restablecer/', mail.outbox[0].body)
 
-	def test_enlace_token_cambia_contrasena_y_permite_login(self):
-		self.client.post(
-			reverse('usuarios_password_reset'),
-			{'email': self.usuario.email},
-		)
-		enlace = next(
-			line.strip()
-			for line in mail.outbox[0].body.splitlines()
-			if '/usuarios/restablecer/' in line
-		)
-		ruta = enlace.removeprefix('http://testserver')
-		response = self.client.get(ruta, follow=True)
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Crear nueva contraseña')
+	def test_codigo_vence_a_los_minutos_configurados(self):
+		antes = timezone.now()
+		self.solicitar_codigo()
 
-		nueva_contrasena = 'Nueva-clave-segura-237!'
-		response = self.client.post(
-			response.request['PATH_INFO'],
-			{
-				'new_password1': nueva_contrasena,
-				'new_password2': nueva_contrasena,
-			},
-			follow=True,
+		codigo = self.usuario.codigos_verificacion.get()
+		self.assertEqual(codigo.proposito, CodigoVerificacion.Proposito.RECUPERACION)
+		vigencia = codigo.expira_en - antes
+		self.assertGreaterEqual(vigencia, timedelta(minutes=14, seconds=55))
+		self.assertLessEqual(vigencia, timedelta(minutes=15, seconds=5))
+
+	@override_settings(CODIGO_DURACION_MINUTOS=10)
+	def test_duracion_del_codigo_es_configurable(self):
+		self.solicitar_codigo()
+
+		self.assertIn('10 minutos', mail.outbox[0].body)
+		self.assertContains(
+			self.client.get(reverse('usuarios_password_reset_codigo')),
+			'vence en 10 minutos',
 		)
 
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Tu contraseña se cambió correctamente.')
+	def test_pantalla_del_codigo_muestra_seis_casillas(self):
+		self.solicitar_codigo()
+
+		response = self.client.get(reverse('usuarios_password_reset_codigo'))
+
+		html = response.content.decode()
+		self.assertEqual(len(re.findall(r'<input[^>]*data-code-digit', html)), 6)
+		self.assertContains(response, 'código de 6 dígitos')
+
+	def test_codigo_cambia_contrasena_y_permite_login(self):
+		self.solicitar_codigo()
+
+		response = self.confirmar(self.codigo_enviado())
+
+		self.assertRedirects(response, reverse('usuarios_password_reset_complete'))
 		self.usuario.refresh_from_db()
-		self.assertTrue(self.usuario.check_password(nueva_contrasena))
+		self.assertTrue(self.usuario.check_password(self.NUEVA_CONTRASENA))
+		self.assertTrue(
+			self.usuario.codigos_verificacion.filter(usado_en__isnull=False).exists(),
+		)
 
-		self.client.logout()
 		response = self.client.post(
 			reverse('usuarios_login'),
-			{
-				'username': self.usuario.username,
-				'password': nueva_contrasena,
-			},
+			{'username': self.usuario.username, 'password': self.NUEVA_CONTRASENA},
 			follow=True,
 		)
 		self.assertEqual(response.status_code, 200)
 		self.assertIn('_auth_user_id', self.client.session)
 
-	def test_token_invalido_muestra_instrucciones_claras(self):
-		response = self.client.get(
-			reverse(
-				'usuarios_password_reset_confirm',
-				kwargs={'uidb64': 'invalid', 'token': 'invalid-token'},
-			)
+	def test_codigo_solo_se_puede_usar_una_vez(self):
+		self.solicitar_codigo()
+		codigo = self.codigo_enviado()
+		self.confirmar(codigo)
+
+		response = self.confirmar(codigo, contrasena='Otra-clave-segura-555!')
+
+		self.assertContains(response, 'no es válido o expiró')
+		self.usuario.refresh_from_db()
+		self.assertTrue(self.usuario.check_password(self.NUEVA_CONTRASENA))
+
+	def test_codigo_expirado_no_cambia_la_contrasena(self):
+		self.solicitar_codigo()
+		codigo = self.codigo_enviado()
+		self.usuario.codigos_verificacion.update(
+			expira_en=timezone.now() - timedelta(seconds=1),
 		)
+
+		response = self.confirmar(codigo)
+
+		self.assertContains(response, 'no es válido o expiró')
+		self.usuario.refresh_from_db()
+		self.assertTrue(self.usuario.check_password('Clave-inicial-segura-934!'))
+
+	def test_codigo_incorrecto_se_bloquea_tras_cinco_intentos(self):
+		self.solicitar_codigo()
+		correcto = self.codigo_enviado()
+		incorrecto = '000000' if correcto != '000000' else '111111'
+
+		for _ in range(5):
+			response = self.confirmar(incorrecto)
+			self.assertContains(response, 'El código es incorrecto')
+
+		response = self.confirmar(correcto)
+
+		self.assertContains(response, 'no es válido o expiró')
+		self.usuario.refresh_from_db()
+		self.assertTrue(self.usuario.check_password('Clave-inicial-segura-934!'))
+
+	def test_codigo_con_longitud_incorrecta_se_rechaza(self):
+		self.solicitar_codigo()
+
+		response = self.confirmar('1234')
+
+		self.assertContains(response, 'Ingresa los 6 dígitos del código.')
+
+	def test_contrasena_debil_no_consume_el_codigo(self):
+		self.solicitar_codigo()
+		codigo = self.codigo_enviado()
+
+		response = self.confirmar(codigo, contrasena='12345678')
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'El enlace para restablecer la contraseña no es válido o ya expiró.')
-		self.assertContains(response, 'Solicitar otro enlace')
-
-	def test_solicitud_con_correo_desconocido_no_revela_si_existe(self):
-		response = self.client.post(
-			reverse('usuarios_password_reset'),
-			{'email': 'desconocido@example.com'},
-			follow=True,
+		self.usuario.refresh_from_db()
+		self.assertTrue(self.usuario.check_password('Clave-inicial-segura-934!'))
+		self.assertFalse(
+			self.usuario.codigos_verificacion.filter(usado_en__isnull=False).exists(),
+		)
+		self.assertRedirects(
+			self.confirmar(codigo),
+			reverse('usuarios_password_reset_complete'),
 		)
 
-		self.assertContains(response, 'Si existe una cuenta activa asociada a ese correo')
+	def test_codigo_de_registro_no_sirve_para_recuperar(self):
+		CodigoVerificacion.objects.create(
+			usuario=self.usuario,
+			proposito=CodigoVerificacion.Proposito.REGISTRO,
+			codigo_hash=make_password('123456'),
+			expira_en=timezone.now() + timedelta(minutes=10),
+		)
+
+		response = self.confirmar('123456')
+
+		self.assertContains(response, 'no es válido o expiró')
+
+	def test_solicitud_con_correo_desconocido_no_revela_si_existe(self):
+		response = self.solicitar_codigo('desconocido@example.com')
+
+		self.assertRedirects(
+			response,
+			f'{reverse("usuarios_password_reset_codigo")}?email=desconocido%40example.com',
+			fetch_redirect_response=False,
+		)
 		self.assertEqual(len(mail.outbox), 0)
+		self.assertContains(
+			self.client.get(response['Location']),
+			'Si existe una cuenta activa con ese correo',
+		)
+
+	def test_usuario_inactivo_no_recibe_codigo(self):
+		self.usuario.is_active = False
+		self.usuario.save(update_fields=['is_active'])
+
+		self.solicitar_codigo()
+
+		self.assertEqual(len(mail.outbox), 0)
+		self.assertFalse(self.usuario.codigos_verificacion.exists())
+
+	def test_cuenta_desactivada_despues_de_pedir_codigo_no_puede_cambiar_clave(self):
+		self.solicitar_codigo()
+		codigo = self.codigo_enviado()
+		self.usuario.is_active = False
+		self.usuario.save(update_fields=['is_active'])
+
+		response = self.confirmar(codigo)
+
+		self.assertContains(response, 'no es válido o expiró')
+
+	def test_reenvio_inmediato_no_envia_otro_correo(self):
+		self.solicitar_codigo()
+
+		response = self.solicitar_codigo()
+
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(len(mail.outbox), 1)
+
+	def test_nuevo_codigo_invalida_el_anterior(self):
+		self.solicitar_codigo()
+		primero = self.codigo_enviado()
+		self.usuario.codigos_verificacion.update(
+			creado_en=timezone.now() - timedelta(minutes=5),
+		)
+		self.solicitar_codigo()
+		segundo = self.codigo_enviado(1)
+
+		if primero != segundo:
+			response = self.confirmar(primero)
+			self.assertContains(response, 'El código es incorrecto')
+		self.assertRedirects(
+			self.confirmar(segundo),
+			reverse('usuarios_password_reset_complete'),
+		)
+
+	def test_fallo_de_envio_muestra_error_y_no_deja_codigo_guardado(self):
+		with patch(
+			'usuarios.views.send_mail',
+			side_effect=smtplib.SMTPException('MessageRejected'),
+		), self.assertLogs('usuarios.views', level='ERROR'):
+			response = self.solicitar_codigo()
+
+		self.assertEqual(response.status_code, 503)
+		self.assertContains(response, 'No pudimos enviar el código', status_code=503)
+		self.assertFalse(self.usuario.codigos_verificacion.exists())
+		self.assertEqual(len(mail.outbox), 0)
+
+	def test_el_enlace_olvidaste_tu_contrasena_lleva_al_formulario(self):
+		response = self.client.get(reverse('usuarios_password_reset'))
+
+		self.assertContains(response, 'Enviar código')
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
