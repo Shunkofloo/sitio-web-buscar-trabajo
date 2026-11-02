@@ -24,6 +24,29 @@ class PerfilPostulante(models.Model):
 		return self.nombre_completo
 
 
+class PerfilUsuario(models.Model):
+	usuario = models.OneToOneField(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name='perfil_profesional',
+	)
+	titular = models.CharField(max_length=180, blank=True)
+	region = models.CharField(max_length=100, blank=True)
+	comuna = models.CharField(max_length=100, blank=True)
+	telefono = models.CharField(max_length=30, blank=True)
+	acerca_de = models.TextField(blank=True)
+	experiencia = models.TextField(blank=True)
+	habilidades = models.TextField(blank=True, help_text='Separar habilidades con comas.')
+	curriculum_url = models.URLField(blank=True)
+
+	class Meta:
+		verbose_name = 'perfil de usuario'
+		verbose_name_plural = 'perfiles de usuario'
+
+	def __str__(self):
+		return f'Perfil de {self.usuario.get_full_name() or self.usuario.username}'
+
+
 class CodigoVerificacion(models.Model):
 	class Proposito(models.TextChoices):
 		REGISTRO = 'registro', 'Verificar registro'

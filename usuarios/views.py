@@ -27,11 +27,12 @@ from .forms import (
 	FormularioCrearUsuario,
 	FormularioEditarUsuario,
 	FormularioInicioSesion,
+	FormularioPerfilUsuario,
 	FormularioRecuperarContrasena,
 	FormularioRegistroPublico,
 )
 from .mixins import LoginYPermisoRequeridoMixin
-from .models import CodigoVerificacion, PerfilPostulante
+from .models import CodigoVerificacion, PerfilPostulante, PerfilUsuario
 from .roles import obtener_dashboard_usuario
 
 
@@ -452,6 +453,55 @@ def redireccion_dashboard(request):
 		)
 		return redirect('eventos_inicio')
 	return redirect(dashboard_url)
+
+
+@login_required
+def perfil_usuario(request):
+	_, dashboard_url = obtener_dashboard_usuario(request.user)
+	if dashboard_url:
+		messages.info(
+			request,
+			'El perfil profesional está disponible para las cuentas de usuarios postulantes.',
+		)
+		return redirect(dashboard_url)
+
+	perfil, _ = PerfilUsuario.objects.get_or_create(usuario=request.user)
+	editar = request.method == 'POST' or request.GET.get('editar') == '1'
+	form = FormularioPerfilUsuario(
+		request.POST or None,
+		instance=perfil,
+		usuario=request.user,
+	)
+
+	if request.method == 'POST':
+		if form.is_valid():
+			with transaction.atomic():
+				form.save()
+			messages.success(request, 'Tu perfil profesional se actualizó correctamente.')
+			return redirect('usuarios_perfil')
+		messages.error(request, 'No se pudo guardar el perfil. Revisa los campos indicados.')
+
+	campos_completos = sum(bool(getattr(perfil, campo)) for campo in (
+		'titular',
+		'region',
+		'comuna',
+		'telefono',
+		'acerca_de',
+		'experiencia',
+		'habilidades',
+		'curriculum_url',
+	))
+	return render(request, 'usuarios/perfil.html', {
+		'perfil': perfil,
+		'form': form,
+		'editar': editar,
+		'habilidades_lista': [
+			habilidad.strip()
+			for habilidad in perfil.habilidades.split(',')
+			if habilidad.strip()
+		],
+		'completitud_perfil': round(campos_completos / 8 * 100),
+	})
 
 
 def _mostrar_dashboard(request, nombre_grupo):

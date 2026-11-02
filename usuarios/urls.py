@@ -16,11 +16,13 @@ from .views import (
 	dashboard_administrativo,
 	dashboard_supervisor,
 	redireccion_dashboard,
+	perfil_usuario,
 )
 
 urlpatterns = [
 	path('login/', IniciarSesionView.as_view(), name='usuarios_login'),
 	path('logout/', CerrarSesionView.as_view(), name='usuarios_logout'),
+	path('perfil/', perfil_usuario, name='usuarios_perfil'),
 	path('registro/', RegistroPublicoView.as_view(), name='usuarios_registro'),
 	path(
 		'registro/codigo/',

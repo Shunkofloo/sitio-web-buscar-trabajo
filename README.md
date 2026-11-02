@@ -22,6 +22,7 @@ El acceso de edición o eliminación se controla en el servidor mediante permiso
 - Registro transaccional de postulaciones: crea o actualiza la ficha del candidato por correo y registra la postulación en una sola operación. Solo permite ofertas publicadas y vigentes, evita postulaciones duplicadas y valida la carta de presentación.
 - Listado de postulaciones con filtros por estado y oferta, página de detalle y cambio de estado autorizado.
 - Inicio y cierre de sesión con el sistema de autenticación de Django y redirección al dashboard del grupo.
+- Perfil profesional privado para cada cuenta, con edición de presentación, experiencia, habilidades, ubicación y enlace al currículum.
 - Gestión de usuarios: búsqueda, paginación, altas, edición, asignación de grupo y activación/desactivación.
 - Recuperación de contraseña con código de 6 dígitos enviado por correo (Amazon SES), de un solo uso y con vigencia configurable. Ver `GUIA_AWS_SES.md`.
 - Mensajes y formularios Bootstrap en español.
@@ -89,7 +90,7 @@ python manage.py test
 python manage.py makemigrations --check --dry-run
 ```
 
-El conjunto de pruebas cubre autenticación, permisos, mantenedores, postulaciones y recuperación de contraseña. Las pruebas de correo usan el backend local de memoria de Django.
+El conjunto de pruebas cubre autenticación, perfiles, permisos, mantenedores, postulaciones y recuperación de contraseña. Las pruebas de correo usan el backend local de memoria de Django.
 
 ## Despliegue en una instancia EC2
 

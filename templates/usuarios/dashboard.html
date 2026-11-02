@@ -1,6 +1,97 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard {{ nombre_dashboard }}{% endblock %}
 {% block content %}
+{% if nombre_dashboard == 'Administrador' %}
+<div class="admin-dashboard">
+    <section class="admin-hero">
+        <div class="admin-hero-copy">
+            <span class="admin-eyebrow">Centro de control</span>
+            <h1>Panel de administración</h1>
+            <p>Gestiona las principales áreas de Buscar trabajo desde un solo lugar.</p>
+        </div>
+        <div class="admin-account">
+            <span class="admin-avatar" aria-hidden="true">{{ request.user.get_full_name|default:request.user.username|first|upper }}</span>
+            <div>
+                <span class="admin-account-label">Sesión iniciada</span>
+                <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                <span class="admin-role"><span aria-hidden="true"></span> Administrador</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="admin-modules" aria-labelledby="admin-modules-title">
+        <div class="admin-section-heading">
+            <div>
+                <span class="admin-eyebrow">Administración</span>
+                <h2 id="admin-modules-title">Accesos rápidos</h2>
+            </div>
+            <p>Selecciona un módulo para consultar o gestionar su información.</p>
+        </div>
+
+        <div class="admin-module-grid">
+            {% if perms.eventos.view_empresa %}
+            <article class="admin-module-card">
+                <div class="admin-module-icon admin-icon-companies" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M4 20V7.5L12 4l8 3.5V20M2.5 20h19M8 9h1m6 0h1M8 12h1m6 0h1M10 20v-4h4v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Empresas</h3>
+                <p>Administra las organizaciones registradas en la plataforma.</p>
+                <div class="admin-module-actions">
+                    <a class="admin-module-link" href="{% url 'empresa_lista' %}">Ver empresas <span aria-hidden="true">→</span></a>
+                    {% if perms.eventos.add_empresa %}<a class="admin-create-link" href="{% url 'empresa_crear' %}">Nueva</a>{% endif %}
+                </div>
+            </article>
+            {% endif %}
+
+            {% if perms.eventos.view_ofertalaboral %}
+            <article class="admin-module-card">
+                <div class="admin-module-icon admin-icon-jobs" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M4 8h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 20H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 8ZM8 8V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V8m-13.5 4h19M10 12v2h4v-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Ofertas laborales</h3>
+                <p>Publica y actualiza las oportunidades disponibles.</p>
+                <div class="admin-module-actions">
+                    <a class="admin-module-link" href="{% url 'oferta_lista' %}">Ver ofertas <span aria-hidden="true">→</span></a>
+                    {% if perms.eventos.add_ofertalaboral %}<a class="admin-create-link" href="{% url 'oferta_crear' %}">Nueva</a>{% endif %}
+                </div>
+            </article>
+            {% endif %}
+
+            {% if perms.eventos.view_postulacion %}
+            <article class="admin-module-card">
+                <div class="admin-module-icon admin-icon-applications" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1ZM14 4v4h4m-8 4h4m-4 3h4m-4 3h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Postulaciones</h3>
+                <p>Revisa las candidaturas y da seguimiento a cada proceso.</p>
+                <div class="admin-module-actions">
+                    <a class="admin-module-link" href="{% url 'postulacion_lista' %}">Ver postulaciones <span aria-hidden="true">→</span></a>
+                </div>
+            </article>
+            {% endif %}
+
+            {% if perms.auth.view_user %}
+            <article class="admin-module-card">
+                <div class="admin-module-icon admin-icon-users" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20m6-8a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm6-7.5a4 4 0 0 1 0 7.7m2 3.3a3.5 3.5 0 0 1 2 3.2V20" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h3>Usuarios</h3>
+                <p>Gestiona las cuentas y los perfiles de acceso del equipo.</p>
+                <div class="admin-module-actions">
+                    <a class="admin-module-link" href="{% url 'usuario_lista' %}">Ver usuarios <span aria-hidden="true">→</span></a>
+                    {% if perms.auth.add_user %}<a class="admin-create-link" href="{% url 'usuario_crear' %}">Nuevo</a>{% endif %}
+                </div>
+            </article>
+            {% endif %}
+        </div>
+    </section>
+
+    <aside class="admin-help">
+        <span class="admin-help-mark" aria-hidden="true">i</span>
+        <p><strong>Acceso seguro</strong> · Las opciones disponibles dependen de los permisos asignados a tu cuenta.</p>
+    </aside>
+</div>
+{% else %}
 <section class="page-header text-center">
     <div class="container">
         <h1 class="display-6 fw-bold mb-2">Dashboard {{ nombre_dashboard }}</h1>
@@ -16,4 +107,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

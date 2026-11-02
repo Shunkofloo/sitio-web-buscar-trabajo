@@ -1,27 +1,193 @@
 {% extends 'base.html' %}
-{% block title %}Mi perfil profesional{% endblock %}
+{% block title %}{% if editar %}Editar perfil{% else %}Mi perfil profesional{% endif %} | Buscar trabajo{% endblock %}
 {% block content %}
-<section class="page-header text-center">
-    <div class="container">
-        <h1 class="display-6 fw-bold mb-2">Mi perfil profesional</h1>
-        <p class="mb-0">Sesión iniciada correctamente. Tu próximo paso profesional está a un clic.</p>
+<div class="professional-profile">
+    <div class="profile-page-heading">
+        <div>
+            <span class="profile-overline">MI ESPACIO</span>
+            <h1>{% if editar %}Edita tu perfil{% else %}Mi perfil profesional{% endif %}</h1>
+            <p>{% if editar %}Comparte lo mejor de tu experiencia y tus objetivos profesionales.{% else %}Tu trayectoria y tus habilidades, presentadas en un solo lugar.{% endif %}</p>
+        </div>
+        {% if not editar %}
+        <a class="profile-edit-button" href="{% url 'usuarios_perfil' %}?editar=1">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l4.2-.8L19 8.4a2.1 2.1 0 0 0-3-3L5.2 16.2 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Editar perfil
+        </a>
+        {% endif %}
     </div>
-</section>
 
-<div class="row justify-content-center">
-    <div class="col-lg-6">
-        <div class="section-card p-4">
-            <h4 class="fw-bold mb-3">Hola, {{ nombre_usuario }} 👋</h4>
-            <ul class="list-group list-group-flush mb-4">
-                <li class="list-group-item"><strong>Usuario:</strong> {{ usuario }}</li>
-                <li class="list-group-item"><strong>Rol:</strong> {{ rol_usuario }}</li>
-                <li class="list-group-item"><strong>Fecha y hora de acceso:</strong> {{ fecha_actual }}</li>
-            </ul>
-            <form method="post" action="{% url 'usuarios_logout' %}">
+    <section class="professional-profile-card">
+        <div class="profile-cover" aria-hidden="true">
+            <span class="profile-cover-orb profile-cover-orb-one"></span>
+            <span class="profile-cover-orb profile-cover-orb-two"></span>
+            <span class="profile-cover-label">BUSCAR TRABAJO <span>·</span> PERFIL PROFESIONAL</span>
+        </div>
+
+        <div class="profile-identity">
+            <div class="profile-avatar" aria-label="Iniciales de {{ request.user.get_full_name|default:request.user.username }}">
+                {% if request.user.first_name %}{{ request.user.first_name|first|upper }}{% else %}{{ request.user.username|first|upper }}{% endif %}{% if request.user.last_name %}{{ request.user.last_name|first|upper }}{% endif %}
+            </div>
+            <div class="profile-identity-content">
+                <div class="profile-name-row">
+                    <h2>{{ request.user.get_full_name|default:request.user.username }}</h2>
+                    <span class="profile-status"><span aria-hidden="true"></span> Perfil personal</span>
+                </div>
+                <p class="profile-headline">{% if perfil.titular %}{{ perfil.titular }}{% else %}Añade un titular para contar quién eres profesionalmente.{% endif %}</p>
+                <div class="profile-location">
+                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg>
+                    {% if perfil.comuna or perfil.region %}{{ perfil.comuna }}{% if perfil.comuna and perfil.region %}, {% endif %}{{ perfil.region }}{% else %}Añade tu ubicación{% endif %}
+                    <span class="profile-location-separator">·</span>
+                    <a href="mailto:{{ request.user.email }}">{{ request.user.email|default:'Añade un correo electrónico a tu cuenta' }}</a>
+                </div>
+            </div>
+        </div>
+
+        {% if editar %}
+        <div class="profile-form-wrap">
+            <div class="profile-form-heading">
+                <div>
+                    <span class="profile-overline">TU INFORMACIÓN</span>
+                    <h2>Cuéntanos sobre ti</h2>
+                    <p>Los campos con asterisco son obligatorios.</p>
+                </div>
+                <span class="profile-private-note"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8 10V7a4 4 0 1 1 8 0v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> Visible solo para ti</span>
+            </div>
+            <form method="post" class="profile-form">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-outline-danger">Cerrar sesión</button>
+                <div class="profile-form-grid">
+                    {% for field in form %}
+                    <div class="profile-form-field{% if field.name == 'acerca_de' or field.name == 'experiencia' or field.name == 'habilidades' %} profile-form-field-wide{% endif %}">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span aria-hidden="true">*</span>{% endif %}</label>
+                        {{ field }}
+                        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                        {% for error in field.errors %}<span class="profile-field-error">{{ error }}</span>{% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="profile-form-actions">
+                    <a class="profile-cancel-button" href="{% url 'usuarios_perfil' %}">Cancelar</a>
+                    <button class="profile-save-button" type="submit">Guardar cambios</button>
+                </div>
             </form>
         </div>
-    </div>
+        {% else %}
+        <div class="profile-content-grid">
+            <div class="profile-main-column">
+                <section class="profile-section">
+                    <div class="profile-section-heading">
+                        <div>
+                            <span class="profile-overline">PRESENTACIÓN</span>
+                            <h3>Acerca de mí</h3>
+                        </div>
+                        <a class="profile-section-edit" href="{% url 'usuarios_perfil' %}?editar=1" aria-label="Editar acerca de mí">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l4.2-.8L19 8.4a2.1 2.1 0 0 0-3-3L5.2 16.2 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </a>
+                    </div>
+                    {% if perfil.acerca_de %}
+                    <p class="profile-body-copy">{{ perfil.acerca_de|linebreaksbr }}</p>
+                    {% else %}
+                    <p class="profile-empty-copy">Presenta brevemente tu trayectoria, tus intereses y el tipo de oportunidad que estás buscando.</p>
+                    <a class="profile-inline-link" href="{% url 'usuarios_perfil' %}?editar=1">Añadir presentación <span aria-hidden="true">→</span></a>
+                    {% endif %}
+                </section>
+
+                <section class="profile-section">
+                    <div class="profile-section-heading">
+                        <div>
+                            <span class="profile-overline">TRAYECTORIA</span>
+                            <h3>Experiencia profesional</h3>
+                        </div>
+                        <a class="profile-section-edit" href="{% url 'usuarios_perfil' %}?editar=1" aria-label="Editar experiencia">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l4.2-.8L19 8.4a2.1 2.1 0 0 0-3-3L5.2 16.2 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </a>
+                    </div>
+                    {% if perfil.experiencia %}
+                    <div class="profile-experience-entry">
+                        <span class="profile-experience-mark" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none"><path d="M4 8h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 20H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 8ZM8 8V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        <div>
+                            <h4>{% if perfil.titular %}{{ perfil.titular }}{% else %}Experiencia profesional{% endif %}</h4>
+                            <p class="profile-body-copy">{{ perfil.experiencia|linebreaksbr }}</p>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="profile-empty-copy">Añade tus experiencias, responsabilidades y principales logros.</p>
+                    <a class="profile-inline-link" href="{% url 'usuarios_perfil' %}?editar=1">Añadir experiencia <span aria-hidden="true">→</span></a>
+                    {% endif %}
+                </section>
+
+                <section class="profile-section profile-skills-section">
+                    <div class="profile-section-heading">
+                        <div>
+                            <span class="profile-overline">FORTALEZAS</span>
+                            <h3>Habilidades</h3>
+                        </div>
+                        <a class="profile-section-edit" href="{% url 'usuarios_perfil' %}?editar=1" aria-label="Editar habilidades">
+                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l4.2-.8L19 8.4a2.1 2.1 0 0 0-3-3L5.2 16.2 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </a>
+                    </div>
+                    {% if habilidades_lista %}
+                    <div class="profile-skill-list">
+                        {% for habilidad in habilidades_lista %}<span>{{ habilidad }}</span>{% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="profile-empty-copy">Destaca las competencias que te gustaría compartir con futuros empleadores.</p>
+                    <a class="profile-inline-link" href="{% url 'usuarios_perfil' %}?editar=1">Añadir habilidades <span aria-hidden="true">→</span></a>
+                    {% endif %}
+                </section>
+            </div>
+
+            <aside class="profile-side-column">
+                <section class="profile-sidebar-card profile-progress-card">
+                    <span class="profile-overline">TU PERFIL</span>
+                    <div class="profile-progress-title">
+                        <h3>Completa tu perfil</h3>
+                        <strong>{{ completitud_perfil }}%</strong>
+                    </div>
+                    <div class="profile-progress-track" role="progressbar" aria-label="Completitud del perfil" aria-valuenow="{{ completitud_perfil }}" aria-valuemin="0" aria-valuemax="100">
+                        <span style="width: {{ completitud_perfil }}%"></span>
+                    </div>
+                    <p>Un perfil completo ayuda a presentar mejor tu experiencia y tus objetivos.</p>
+                    <a class="profile-sidebar-link" href="{% url 'usuarios_perfil' %}?editar=1">Mejorar mi perfil <span aria-hidden="true">→</span></a>
+                </section>
+
+                <section class="profile-sidebar-card">
+                    <span class="profile-overline">CONTACTO</span>
+                    <h3>Información de contacto</h3>
+                    <dl class="profile-contact-list">
+                        <div>
+                            <dt><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> Correo</dt>
+                            <dd>{% if request.user.email %}<a href="mailto:{{ request.user.email }}">{{ request.user.email }}</a>{% else %}No indicado{% endif %}</dd>
+                        </div>
+                        <div>
+                            <dt><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3h3l2 5-2.2 1.5a15 15 0 0 0 4.7 4.7L16 12l5 2v3a3 3 0 0 1-3 3C10.3 20 4 13.7 4 6a3 3 0 0 1 3-3Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg> Teléfono</dt>
+                            <dd>{% if perfil.telefono %}<a href="tel:{{ perfil.telefono }}">{{ perfil.telefono }}</a>{% else %}No indicado{% endif %}</dd>
+                        </div>
+                        <div>
+                            <dt><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg> Ubicación</dt>
+                            <dd>{% if perfil.comuna or perfil.region %}{{ perfil.comuna }}{% if perfil.comuna and perfil.region %}, {% endif %}{{ perfil.region }}{% else %}No indicada{% endif %}</dd>
+                        </div>
+                    </dl>
+                </section>
+
+                <section class="profile-sidebar-card profile-cv-card">
+                    <span class="profile-overline">DOCUMENTOS</span>
+                    <h3>Currículum</h3>
+                    {% if perfil.curriculum_url %}
+                    <p>Comparte tu currículum con un enlace seguro.</p>
+                    <a class="profile-cv-link" href="{{ perfil.curriculum_url }}" target="_blank" rel="noopener noreferrer">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1ZM14 4v4h4m-8 4h4m-4 3h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Abrir currículum <span aria-hidden="true">↗</span>
+                    </a>
+                    {% else %}
+                    <p>Añade un enlace a tu currículum para tenerlo a mano en tu perfil.</p>
+                    <a class="profile-sidebar-link" href="{% url 'usuarios_perfil' %}?editar=1">Añadir enlace <span aria-hidden="true">→</span></a>
+                    {% endif %}
+                </section>
+            </aside>
+        </div>
+        {% endif %}
+    </section>
 </div>
 {% endblock %}

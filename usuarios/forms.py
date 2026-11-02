@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db.models import Q
 
-from .models import PerfilPostulante
+from .models import PerfilPostulante, PerfilUsuario
 
 
 User = get_user_model()
@@ -124,6 +124,72 @@ class FormularioEditarUsuario(FormularioBootstrapMixin, forms.ModelForm):
 		if commit:
 			usuario.groups.set((self.cleaned_data['grupo'],))
 		return usuario
+
+
+class FormularioPerfilUsuario(FormularioBootstrapMixin, forms.ModelForm):
+	nombre = forms.CharField(label='Nombre', max_length=150)
+	apellido = forms.CharField(label='Apellido', max_length=150, required=False)
+
+	class Meta:
+		model = PerfilUsuario
+		fields = (
+			'titular',
+			'region',
+			'comuna',
+			'telefono',
+			'acerca_de',
+			'experiencia',
+			'habilidades',
+			'curriculum_url',
+		)
+		labels = {
+			'titular': 'Titular profesional',
+			'region': 'Región',
+			'comuna': 'Comuna',
+			'telefono': 'Teléfono',
+			'acerca_de': 'Acerca de mí',
+			'experiencia': 'Experiencia profesional',
+			'habilidades': 'Habilidades',
+			'curriculum_url': 'Enlace a mi currículum',
+		}
+		help_texts = {
+			'titular': 'Por ejemplo: Desarrolladora web | Atención al cliente | Estudiante de enfermería',
+			'habilidades': 'Escribe tus habilidades separadas por comas.',
+			'curriculum_url': 'Pega un enlace seguro a tu currículum, si tienes uno.',
+		}
+		widgets = {
+			'acerca_de': forms.Textarea(attrs={'rows': 5}),
+			'experiencia': forms.Textarea(attrs={'rows': 5}),
+			'habilidades': forms.Textarea(attrs={'rows': 3}),
+			'curriculum_url': forms.URLInput(attrs={'placeholder': 'https://'}),
+		}
+
+	def __init__(self, *args, **kwargs):
+		self.usuario = kwargs.pop('usuario')
+		super().__init__(*args, **kwargs)
+		self.fields['nombre'].initial = self.usuario.first_name
+		self.fields['apellido'].initial = self.usuario.last_name
+		self.order_fields((
+			'nombre',
+			'apellido',
+			'titular',
+			'region',
+			'comuna',
+			'telefono',
+			'acerca_de',
+			'experiencia',
+			'habilidades',
+			'curriculum_url',
+		))
+		self.aplicar_clases_bootstrap()
+
+	def save(self, commit=True):
+		perfil = super().save(commit=commit)
+		if commit:
+			self.usuario.first_name = self.cleaned_data['nombre'].strip()
+			self.usuario.last_name = self.cleaned_data['apellido'].strip()
+			self.usuario.save(update_fields=('first_name', 'last_name'))
+		return perfil
 
 
 class FormularioInicioSesion(AuthenticationForm):

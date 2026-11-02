@@ -14,7 +14,7 @@ from django.utils import timezone
 from io import StringIO
 from unittest.mock import patch
 
-from .models import CodigoVerificacion, PerfilPostulante
+from .models import CodigoVerificacion, PerfilPostulante, PerfilUsuario
 from .mixins import LoginYPermisoRequeridoMixin, grupo_principal
 
 
@@ -528,6 +528,94 @@ class PerfilPostulanteTests(TestCase):
 
 		self.assertEqual(str(perfil), 'Candidata de prueba')
 		self.assertNotIn('usuario', {field.name for field in PerfilPostulante._meta.fields})
+
+
+class PerfilUsuarioTests(TestCase):
+	def setUp(self):
+		self.usuario = get_user_model().objects.create_user(
+			username='profesional',
+			password='clave-segura',
+			first_name='Ana',
+			last_name='Pérez',
+			email='ana@example.com',
+		)
+		self.client.force_login(self.usuario)
+
+	def test_perfil_personal_se_crea_y_muestra_solo_para_usuario_autenticado(self):
+		response = self.client.get(reverse('usuarios_perfil'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Mi perfil profesional')
+		self.assertContains(response, 'Ana Pérez')
+		self.assertTrue(PerfilUsuario.objects.filter(usuario=self.usuario).exists())
+		self.assertEqual(PerfilUsuario.objects.count(), 1)
+
+	def test_actualiza_datos_profesionales_y_nombre_de_la_cuenta(self):
+		response = self.client.post(reverse('usuarios_perfil'), {
+			'nombre': 'Ana María',
+			'apellido': 'Pérez Soto',
+			'titular': 'Desarrolladora backend',
+			'region': 'Región de Coquimbo',
+			'comuna': 'La Serena',
+			'telefono': '+56 9 1234 5678',
+			'acerca_de': 'Me interesa crear productos útiles.',
+			'experiencia': 'Dos años desarrollando aplicaciones.',
+			'habilidades': 'Python, Django, SQL',
+			'curriculum_url': 'https://example.com/cv',
+		}, follow=True)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Tu perfil profesional se actualizó correctamente.')
+		self.usuario.refresh_from_db()
+		perfil = PerfilUsuario.objects.get(usuario=self.usuario)
+		self.assertEqual(self.usuario.get_full_name(), 'Ana María Pérez Soto')
+		self.assertEqual(perfil.titular, 'Desarrolladora backend')
+		self.assertEqual(perfil.comuna, 'La Serena')
+		self.assertEqual(perfil.habilidades, 'Python, Django, SQL')
+		self.assertContains(response, 'Desarrolladora backend')
+
+	def test_edicion_rechaza_url_invalida_y_no_guarda_cambios_parciales(self):
+		response = self.client.post(reverse('usuarios_perfil'), {
+			'nombre': 'Nombre cambiado',
+			'apellido': 'Pérez',
+			'titular': 'Nuevo titular',
+			'curriculum_url': 'no-es-una-url',
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'profile-field-error')
+		self.usuario.refresh_from_db()
+		self.assertEqual(self.usuario.first_name, 'Ana')
+		self.assertFalse(PerfilUsuario.objects.get(usuario=self.usuario).titular)
+
+	def test_perfil_requiere_autenticacion(self):
+		self.client.logout()
+
+		response = self.client.get(reverse('usuarios_perfil'))
+
+		self.assertRedirects(
+			response,
+			'/usuarios/login/?next=/usuarios/perfil/',
+		)
+
+	def test_perfil_no_se_habilita_para_cuentas_de_gestion(self):
+		rutas_dashboard = {
+			'Administrador': 'usuarios_dashboard_administrador',
+			'Supervisor': 'usuarios_dashboard_supervisor',
+			'Administrativo': 'usuarios_dashboard_administrativo',
+		}
+		for nombre_grupo, nombre_ruta in rutas_dashboard.items():
+			with self.subTest(grupo=nombre_grupo):
+				self.usuario.groups.set([Group.objects.create(name=nombre_grupo)])
+
+				response = self.client.get(reverse('usuarios_perfil'))
+
+				self.assertRedirects(response, reverse(nombre_ruta))
+				self.assertFalse(PerfilUsuario.objects.filter(usuario=self.usuario).exists())
+				self.assertNotContains(
+					self.client.get(reverse(nombre_ruta)),
+					'href="/usuarios/perfil/"',
+				)
 
 
 class CrearRolesCommandTests(TestCase):
