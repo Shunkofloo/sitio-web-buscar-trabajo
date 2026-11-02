@@ -17,8 +17,30 @@
             {% endfor %}
             {% for field in form %}
                 <div class="mb-3">
-                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
+                    {% if field.name == 'codigo' %}
+                        <label class="form-label d-block" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        <div class="d-flex gap-2 mb-2" role="group" aria-label="Código de verificación de cuatro dígitos">
+                            {% for digit in '1234' %}
+                                <input
+                                    class="form-control text-center fs-4 fw-bold"
+                                    style="width: 3.5rem; height: 3.75rem;"
+                                    type="text"
+                                    inputmode="numeric"
+                                    pattern="[0-9]"
+                                    maxlength="1"
+                                    placeholder="_"
+                                    aria-label="Dígito {{ forloop.counter }}"
+                                    autocomplete="{% if forloop.first %}one-time-code{% else %}off{% endif %}"
+                                    data-code-digit
+                                    required
+                                >
+                            {% endfor %}
+                        </div>
+                        {{ field.as_hidden }}
+                    {% else %}
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                    {% endif %}
                     {% for error in field.errors %}
                         <div class="invalid-feedback d-block">{{ error }}</div>
                     {% endfor %}
@@ -30,4 +52,41 @@
         </form>
     </div>
 </div>
+<script>
+    const codeInputs = Array.from(document.querySelectorAll('[data-code-digit]'));
+    const codeField = document.getElementById('{{ form.codigo.id_for_label }}');
+    const codeForm = codeField.form;
+
+    function syncCode() {
+        codeField.value = codeInputs.map(input => input.value).join('');
+    }
+
+    codeInputs.forEach((input, index) => {
+        input.addEventListener('input', () => {
+            const digits = input.value.replace(/\D/g, '');
+            input.value = digits.slice(-1);
+            syncCode();
+            if (input.value && codeInputs[index + 1]) {
+                codeInputs[index + 1].focus();
+            }
+        });
+        input.addEventListener('keydown', event => {
+            if (event.key === 'Backspace' && !input.value && codeInputs[index - 1]) {
+                codeInputs[index - 1].focus();
+            }
+        });
+        input.addEventListener('paste', event => {
+            const digits = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+            if (!digits) return;
+            event.preventDefault();
+            digits.split('').forEach((digit, digitIndex) => {
+                if (codeInputs[digitIndex]) codeInputs[digitIndex].value = digit;
+            });
+            syncCode();
+            codeInputs[Math.min(digits.length, codeInputs.length - 1)].focus();
+        });
+    });
+
+    codeForm.addEventListener('submit', syncCode);
+</script>
 {% endblock %}

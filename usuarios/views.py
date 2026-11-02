@@ -8,14 +8,21 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.password_validation import validate_password
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import (
+	LoginView,
+	LogoutView,
+	PasswordResetCompleteView,
+	PasswordResetConfirmView,
+	PasswordResetDoneView,
+	PasswordResetView,
+)
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.db.models import Q
 from django.db import transaction
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
@@ -27,6 +34,7 @@ from .forms import (
 	FormularioInicioSesion,
 	FormularioRecuperarContrasena,
 	FormularioRegistroPublico,
+	FormularioRestablecerContrasena,
 )
 from .mixins import LoginYPermisoRequeridoMixin
 from .models import CodigoVerificacion, PerfilPostulante
@@ -124,43 +132,15 @@ class CerrarSesionView(LogoutView):
 	pass
 
 
-class RecuperarContrasenaView(View):
+class RecuperarContrasenaView(PasswordResetView):
 	template_name = 'usuarios/password_reset_form.html'
-
-	def get(self, request, *args, **kwargs):
-		return render(request, self.template_name, {'form': FormularioRecuperarContrasena()})
-
-	def post(self, request, *args, **kwargs):
-		form = FormularioRecuperarContrasena(request.POST)
-		if not form.is_valid():
-			return render(request, self.template_name, {'form': form})
-		usuario = User.objects.filter(
-			email__iexact=form.cleaned_data['email'],
-			is_active=True,
-		).order_by('pk').first()
-		if usuario:
-			try:
-				with transaction.atomic():
-					_crear_y_enviar_codigo(
-						usuario,
-						CodigoVerificacion.Proposito.RECUPERACION,
-					)
-			except CodigoReenvioReciente:
-				form.add_error(
-					None,
-					'Ya enviamos un código hace poco. Espera un minuto antes de solicitar otro.',
-				)
-				return render(request, self.template_name, {'form': form}, status=429)
-			except (ErrorEntregaCorreo, OSError, smtplib.SMTPException):
-				form.add_error(
-					None,
-					'No pudimos enviar el código. Inténtalo más tarde o contacta al administrador.',
-				)
-				return render(request, self.template_name, {'form': form}, status=503)
-		return redirect('usuarios_password_reset_done')
+	email_template_name = 'usuarios/password_reset_email.html'
+	subject_template_name = 'usuarios/password_reset_subject.txt'
+	form_class = FormularioRecuperarContrasena
+	success_url = reverse_lazy('usuarios_password_reset_done')
 
 
-class RecuperarContrasenaEnviadaView(TemplateView):
+class RecuperarContrasenaEnviadaView(PasswordResetDoneView):
 	template_name = 'usuarios/password_reset_done.html'
 
 
@@ -309,11 +289,13 @@ class ConfirmarRegistroView(ConfirmarCodigoView):
 	proposito = CodigoVerificacion.Proposito.REGISTRO
 
 
-class ConfirmarRecuperacionView(ConfirmarCodigoView):
-	proposito = CodigoVerificacion.Proposito.RECUPERACION
+class ConfirmarRestablecimientoContrasenaView(PasswordResetConfirmView):
+	template_name = 'usuarios/password_reset_confirm.html'
+	form_class = FormularioRestablecerContrasena
+	success_url = reverse_lazy('usuarios_password_reset_complete')
 
 
-class RestablecimientoContrasenaCompletoView(TemplateView):
+class RestablecimientoContrasenaCompletoView(PasswordResetCompleteView):
 	template_name = 'usuarios/password_reset_complete.html'
 
 

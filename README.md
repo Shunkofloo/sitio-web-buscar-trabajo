@@ -55,9 +55,9 @@ python manage.py runserver
 
 Abre `http://127.0.0.1:8000/`. El comando `crear_roles` es idempotente para grupos y usuarios demo; sincroniza los permisos y grupos, y establece la contraseña de los usuarios demo a partir de `DEMO_PASSWORD` cada vez que se ejecuta. No uses cuentas demo en producción.
 
-El enlace **Crear usuario** permite registrar nombre, correo, comuna y experiencia laboral. El correo se usa como nombre de usuario. Para completar el registro, la persona verifica su dirección con un código de 4 dígitos y define su contraseña. La recuperación de contraseña usa el mismo tipo de código; vence a los 10 minutos y se bloquea después de 5 intentos incorrectos.
+El enlace **Crear usuario** permite registrar nombre, correo, comuna y experiencia laboral. El correo se usa como nombre de usuario. Para completar el registro, la persona verifica su dirección con un código de 4 dígitos, ingresado en cuatro casillas, y define su contraseña. La recuperación de contraseña envía un enlace con el token seguro de Django para restablecerla.
 
-Para recibir los códigos por correo fuera de pruebas, configura SMTP en `.env` con las variables `EMAIL_*`. El backend predeterminado es la consola, que imprime el mensaje en la terminal y no lo envía por Internet; resulta útil para desarrollo local.
+Para recibir los códigos de registro y los enlaces de recuperación por correo fuera de pruebas, configura SMTP en `.env` con las variables `EMAIL_*`. El backend predeterminado es la consola, que imprime el mensaje en la terminal y no lo envía por Internet; resulta útil para desarrollo local.
 
 ## Variables de entorno
 

@@ -3,7 +3,7 @@ from django.urls import path
 from .views import (
 	IniciarSesionView,
 	CerrarSesionView,
-	ConfirmarRecuperacionView,
+	ConfirmarRestablecimientoContrasenaView,
 	ConfirmarRegistroView,
 	RecuperarContrasenaEnviadaView,
 	RecuperarContrasenaView,
@@ -35,8 +35,8 @@ urlpatterns = [
 		name='usuarios_password_reset_done',
 	),
 	path(
-		'recuperar/codigo/',
-		ConfirmarRecuperacionView.as_view(),
+		'restablecer/<uidb64>/<token>/',
+		ConfirmarRestablecimientoContrasenaView.as_view(),
 		name='usuarios_password_reset_confirm',
 	),
 	path(

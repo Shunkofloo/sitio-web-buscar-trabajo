@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import (
 	AuthenticationForm,
 	PasswordResetForm,
+	SetPasswordForm,
 	UserCreationForm,
 )
 from django.contrib.auth.models import Group
@@ -157,6 +158,14 @@ class FormularioRecuperarContrasena(FormularioBootstrapMixin, PasswordResetForm)
 			'class': 'form-control',
 			'autocomplete': 'email',
 		})
+
+
+class FormularioRestablecerContrasena(FormularioBootstrapMixin, SetPasswordForm):
+	def __init__(self, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.fields['new_password1'].label = 'Nueva contraseña'
+		self.fields['new_password2'].label = 'Confirmar nueva contraseña'
+		self.aplicar_clases_bootstrap()
 
 
 class FormularioRegistroPublico(FormularioBootstrapMixin, forms.Form):
