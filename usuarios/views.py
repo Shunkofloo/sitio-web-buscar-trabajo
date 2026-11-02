@@ -135,6 +135,7 @@ class CerrarSesionView(LogoutView):
 class RecuperarContrasenaView(PasswordResetView):
 	template_name = 'usuarios/password_reset_form.html'
 	email_template_name = 'usuarios/password_reset_email.html'
+	html_email_template_name = 'usuarios/password_reset_email_html.html'
 	subject_template_name = 'usuarios/password_reset_subject.txt'
 	form_class = FormularioRecuperarContrasena
 	success_url = reverse_lazy('usuarios_password_reset_done')

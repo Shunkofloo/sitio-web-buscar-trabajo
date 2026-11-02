@@ -162,6 +162,10 @@ class RecuperacionContrasenaTests(TestCase):
 		self.assertEqual(mail.outbox[0].to, [self.usuario.email])
 		self.assertIn('enlace seguro', mail.outbox[0].subject.lower())
 		self.assertIn('/usuarios/restablecer/', mail.outbox[0].body)
+		self.assertEqual(len(mail.outbox[0].alternatives), 1)
+		html = mail.outbox[0].alternatives[0][0]
+		self.assertIn('Recuperar contraseña', html)
+		self.assertIn('/usuarios/restablecer/', html)
 
 	def test_enlace_token_cambia_contrasena_y_permite_login(self):
 		self.client.post(
