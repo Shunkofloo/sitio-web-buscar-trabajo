@@ -3,7 +3,7 @@
 {% block content %}
 <section class="page-header text-center">
     <h1 class="display-6 fw-bold mb-2">Crear usuario</h1>
-    <p class="mb-0">Registra tus datos y verifica tu correo para crear una contraseña.</p>
+    <p class="mb-0">Registra tus datos y crea una contraseña para tu cuenta.</p>
 </section>
 
 <div class="row justify-content-center">
@@ -34,6 +34,9 @@
                             <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                             {{ field }}
                         {% endif %}
+                        {% if field.help_text %}
+                            <div class="form-text">{{ field.help_text }}</div>
+                        {% endif %}
                         {% for error in field.errors %}
                             <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
@@ -41,7 +44,7 @@
                 {% endif %}
             {% endfor %}
 
-            <button class="btn btn-primary" type="submit">Enviar código al correo</button>
+            <button class="btn btn-primary" type="submit">Crear cuenta</button>
             <a class="btn btn-link mt-2" href="{% url 'usuarios_login' %}">Volver a iniciar sesión</a>
         </form>
     </div>

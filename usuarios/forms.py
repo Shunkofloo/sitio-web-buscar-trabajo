@@ -2,6 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import Group
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db.models import Q
@@ -228,6 +229,21 @@ class FormularioRecuperarContrasena(FormularioBootstrapMixin, forms.Form):
 class FormularioRegistroPublico(FormularioBootstrapMixin, forms.Form):
 	nombre_completo = forms.CharField(label='Nombre', max_length=150)
 	email = forms.EmailField(label='Correo electrónico')
+	password1 = forms.CharField(
+		label='Contraseña',
+		help_text='Debe tener al menos 8 caracteres y no ser demasiado común.',
+		widget=forms.PasswordInput(attrs={
+			'autocomplete': 'new-password',
+			'placeholder': 'Crea una contraseña segura',
+		}),
+	)
+	password2 = forms.CharField(
+		label='Confirmar contraseña',
+		widget=forms.PasswordInput(attrs={
+			'autocomplete': 'new-password',
+			'placeholder': 'Escribe nuevamente tu contraseña',
+		}),
+	)
 	comuna = forms.ChoiceField(
 		label='Región y comuna',
 		choices=[
@@ -273,6 +289,19 @@ class FormularioRegistroPublico(FormularioBootstrapMixin, forms.Form):
 
 	def clean(self):
 		datos = super().clean()
+		if datos.get('password1') and datos.get('password2'):
+			if datos['password1'] != datos['password2']:
+				self.add_error('password2', 'Las contraseñas no coinciden.')
+			else:
+				usuario = User(
+					username=datos.get('email', ''),
+					email=datos.get('email', ''),
+					first_name=datos.get('nombre_completo', ''),
+				)
+				try:
+					validate_password(datos['password1'], user=usuario)
+				except ValidationError as error:
+					self.add_error('password1', error)
 		comuna = datos.get('comuna')
 		if comuna:
 			datos['region'] = REGIONES_POR_COMUNA[comuna]

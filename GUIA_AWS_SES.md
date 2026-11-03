@@ -37,7 +37,7 @@ En **SES → SMTP settings → Create SMTP credentials**. Se abre IAM y crea un 
 Las cuentas nuevas de SES están en **sandbox**: solo pueden enviar a direcciones verificadas, hasta 200 correos por día y 1 por segundo. Para que cualquier persona reciba su código:
 
 1. **SES → Account dashboard → Request production access**.
-2. Tipo de correo: **Transactional**. Indica la URL de tu sitio y describe el uso (códigos de verificación y recuperación de contraseña enviados solo a quien los solicita; manejas rebotes y quejas).
+2. Tipo de correo: **Transactional**. Indica la URL de tu sitio y describe el uso (códigos de recuperación de contraseña enviados solo a quien los solicita; manejas rebotes y quejas).
 3. AWS responde normalmente dentro de 96 horas. Verificar antes el dominio ayuda a que lo aprueben.
 
 Mientras esperas puedes probar todo el flujo verificando en SES tu propio correo de destino (**Identities → Create identity → Email address**).

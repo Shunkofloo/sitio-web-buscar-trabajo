@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
-{% block title %}{% if es_registro %}Verificar correo{% else %}Restablecer contraseña{% endif %}{% endblock %}
+{% block title %}Restablecer contraseña{% endblock %}
 {% block content %}
 <section class="page-header text-center">
     <h1 class="display-6 fw-bold mb-2">
-        {% if es_registro %}Verifica tu correo{% else %}Restablecer contraseña{% endif %}
+        Restablecer contraseña
     </h1>
-    <p class="mb-0">Ingresa el código de {{ longitud }} dígitos que enviamos a tu correo y crea una {% if es_registro %}contraseña{% else %}nueva contraseña{% endif %}.</p>
+    <p class="mb-0">Ingresa el código de {{ longitud }} dígitos que enviamos a tu correo y crea una nueva contraseña.</p>
 </section>
 
 <div class="row justify-content-center">
@@ -47,7 +47,7 @@
                 </div>
             {% endfor %}
             <p class="form-text">El código vence en {{ duracion_minutos }} minutos y se bloquea después de {{ max_intentos }} intentos incorrectos.</p>
-            <button class="btn btn-primary" type="submit">{% if es_registro %}Verificar y guardar contraseña{% else %}Cambiar contraseña{% endif %}</button>
+            <button class="btn btn-primary" type="submit">Cambiar contraseña</button>
             <a class="btn btn-link mt-2" href="{{ url_reintentar }}">Solicitar otro código</a>
         </form>
     </div>

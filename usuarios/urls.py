@@ -4,7 +4,6 @@ from .views import (
 	IniciarSesionView,
 	CerrarSesionView,
 	ConfirmarRecuperacionView,
-	ConfirmarRegistroView,
 	RecuperarContrasenaView,
 	RegistroPublicoView,
 	RestablecimientoContrasenaCompletoView,
@@ -24,11 +23,6 @@ urlpatterns = [
 	path('logout/', CerrarSesionView.as_view(), name='usuarios_logout'),
 	path('perfil/', perfil_usuario, name='usuarios_perfil'),
 	path('registro/', RegistroPublicoView.as_view(), name='usuarios_registro'),
-	path(
-		'registro/codigo/',
-		ConfirmarRegistroView.as_view(),
-		name='usuarios_registro_confirmar',
-	),
 	path('recuperar/', RecuperarContrasenaView.as_view(), name='usuarios_password_reset'),
 	path(
 		'recuperar/codigo/',

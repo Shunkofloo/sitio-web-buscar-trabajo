@@ -39,10 +39,7 @@ from .roles import obtener_dashboard_usuario
 logger = logging.getLogger(__name__)
 User = get_user_model()
 CODIGO_MAX_INTENTOS = 5
-LONGITUD_CODIGO = {
-	CodigoVerificacion.Proposito.REGISTRO: 4,
-	CodigoVerificacion.Proposito.RECUPERACION: 6,
-}
+LONGITUD_CODIGO_RECUPERACION = 6
 
 
 class ErrorEntregaCorreo(Exception):
@@ -53,8 +50,9 @@ class CodigoReenvioReciente(Exception):
 	pass
 
 
-def _crear_y_enviar_codigo(usuario, proposito):
+def _crear_y_enviar_codigo(usuario):
 	ahora = timezone.now()
+	proposito = CodigoVerificacion.Proposito.RECUPERACION
 	codigos_recientes = CodigoVerificacion.objects.filter(
 		usuario=usuario,
 		proposito=proposito,
@@ -68,7 +66,7 @@ def _crear_y_enviar_codigo(usuario, proposito):
 	):
 		raise CodigoReenvioReciente
 
-	longitud = LONGITUD_CODIGO[proposito]
+	longitud = LONGITUD_CODIGO_RECUPERACION
 	duracion_minutos = settings.CODIGO_DURACION_MINUTOS
 	codigo = f'{secrets.randbelow(10 ** longitud):0{longitud}d}'
 	CodigoVerificacion.objects.filter(
@@ -82,16 +80,10 @@ def _crear_y_enviar_codigo(usuario, proposito):
 		codigo_hash=make_password(codigo),
 		expira_en=ahora + timedelta(minutes=duracion_minutos),
 	)
-	es_registro = proposito == CodigoVerificacion.Proposito.REGISTRO
-	asunto = (
-		'Verifica tu correo para crear tu cuenta'
-		if es_registro
-		else 'Código para recuperar tu contraseña'
-	)
+	asunto = 'Código para recuperar tu contraseña'
 	mensaje = render_to_string('usuarios/codigo_verificacion_email.txt', {
 		'nombre': usuario.first_name or usuario.username,
 		'codigo': codigo,
-		'es_registro': es_registro,
 		'duracion_minutos': duracion_minutos,
 	})
 	try:
@@ -112,24 +104,17 @@ def _crear_y_enviar_codigo(usuario, proposito):
 		raise ErrorEntregaCorreo
 
 
-def _render_codigo_formulario(request, form, proposito, status=200):
-	es_registro = proposito == CodigoVerificacion.Proposito.REGISTRO
-	longitud = LONGITUD_CODIGO[proposito]
+def _render_codigo_formulario(request, form, status=200):
 	return render(
 		request,
 		'usuarios/codigo_form.html',
 		{
 			'form': form,
-			'es_registro': es_registro,
-			'longitud': longitud,
-			'digitos': range(longitud),
+			'longitud': LONGITUD_CODIGO_RECUPERACION,
+			'digitos': range(LONGITUD_CODIGO_RECUPERACION),
 			'duracion_minutos': settings.CODIGO_DURACION_MINUTOS,
 			'max_intentos': CODIGO_MAX_INTENTOS,
-			'url_reintentar': (
-				reverse('usuarios_registro')
-				if es_registro
-				else reverse('usuarios_password_reset')
-			),
+			'url_reintentar': reverse('usuarios_password_reset'),
 		},
 		status=status,
 	)
@@ -173,10 +158,7 @@ class RecuperarContrasenaView(View):
 		if usuario is not None:
 			try:
 				with transaction.atomic():
-					_crear_y_enviar_codigo(
-						usuario,
-						CodigoVerificacion.Proposito.RECUPERACION,
-					)
+					_crear_y_enviar_codigo(usuario)
 			except CodigoReenvioReciente:
 				# Conserva el código vigente y mantiene la respuesta genérica.
 				pass
@@ -210,109 +192,103 @@ class RegistroPublicoView(View):
 			return render(request, self.template_name, {'form': form})
 
 		datos = form.cleaned_data
-		try:
-			with transaction.atomic():
-				usuario_existente = User.objects.filter(
-					Q(email__iexact=datos['email'])
-					| Q(username__iexact=datos['email']),
-					is_active=False,
-					is_staff=False,
-					is_superuser=False,
-					groups__isnull=True,
+		with transaction.atomic():
+			usuario_existente = User.objects.filter(
+				Q(email__iexact=datos['email'])
+				| Q(username__iexact=datos['email']),
+				is_active=False,
+				is_staff=False,
+				is_superuser=False,
+				groups__isnull=True,
+			).order_by('pk').first()
+			if usuario_existente:
+				usuario = usuario_existente
+				usuario.email = datos['email']
+				usuario.first_name = datos['nombre_completo']
+				usuario.set_password(datos['password1'])
+				usuario.is_active = True
+				usuario.save(update_fields=['email', 'first_name', 'password', 'is_active'])
+				perfil = PerfilPostulante.objects.filter(
+					correo__iexact=datos['email'],
 				).order_by('pk').first()
-				if usuario_existente:
-					usuario = usuario_existente
-					usuario.first_name = datos['nombre_completo']
-					usuario.save(update_fields=['first_name'])
-					perfil = PerfilPostulante.objects.filter(
-						correo__iexact=datos['email'],
-					).order_by('pk').first()
-					if perfil is None:
-						perfil = PerfilPostulante(
-							nombre_completo=datos['nombre_completo'],
-							correo=datos['email'],
-						)
-				else:
-					usuario = User.objects.create_user(
-						username=datos['email'],
-						email=datos['email'],
-						first_name=datos['nombre_completo'],
-						is_active=False,
+				if perfil is None:
+					perfil = PerfilPostulante(
+						nombre_completo=datos['nombre_completo'],
+						correo=datos['email'],
 					)
-					perfil = PerfilPostulante.objects.filter(
-						correo__iexact=datos['email'],
-					).order_by('pk').first()
-					if perfil is None:
-						perfil = PerfilPostulante(
-							nombre_completo=datos['nombre_completo'],
-							correo=datos['email'],
-						)
-				perfil.nombre_completo = datos['nombre_completo']
-				perfil.correo = datos['email']
-				perfil.region = datos['region']
-				perfil.comuna = datos['comuna']
-				perfil.tiene_experiencia = datos['tiene_experiencia']
-				perfil.experiencia = datos['experiencia']
-				perfil.save()
-				_crear_y_enviar_codigo(
-					usuario,
-					CodigoVerificacion.Proposito.REGISTRO,
+			else:
+				usuario = User.objects.create_user(
+					username=datos['email'],
+					email=datos['email'],
+					first_name=datos['nombre_completo'],
+					password=datos['password1'],
+					is_active=True,
 				)
-		except CodigoReenvioReciente:
-			form.add_error(
-				None,
-				'Ya enviamos un código hace poco. Espera un minuto antes de solicitar otro.',
-			)
-			return render(request, self.template_name, {'form': form}, status=429)
-		except (ErrorEntregaCorreo, OSError, UnicodeError, smtplib.SMTPException):
-			form.add_error(
-				None,
-				'No pudimos enviar el código de verificación. Inténtalo más tarde.',
-			)
-			return render(request, self.template_name, {'form': form}, status=503)
+				perfil = PerfilPostulante.objects.filter(
+					correo__iexact=datos['email'],
+				).order_by('pk').first()
+				if perfil is None:
+					perfil = PerfilPostulante(
+						nombre_completo=datos['nombre_completo'],
+						correo=datos['email'],
+					)
+			perfil.nombre_completo = datos['nombre_completo']
+			perfil.correo = datos['email']
+			perfil.region = datos['region']
+			perfil.comuna = datos['comuna']
+			perfil.tiene_experiencia = datos['tiene_experiencia']
+			perfil.experiencia = datos['experiencia']
+			perfil.save()
 
-		return redirect(
-			f'{reverse("usuarios_registro_confirmar")}?'
-			f'{urlencode({"email": datos["email"]})}'
+		messages.success(
+			request,
+			'Tu cuenta fue creada correctamente. Ya puedes iniciar sesión.',
 		)
+		return redirect('usuarios_login')
 
 
-class ConfirmarCodigoView(View):
-	proposito = None
-
+class ConfirmarRecuperacionView(View):
 	def get(self, request, *args, **kwargs):
 		form = FormularioCodigoYContrasena(
 			initial={'email': request.GET.get('email', '').strip().lower()},
-			longitud=LONGITUD_CODIGO[self.proposito],
+			longitud=LONGITUD_CODIGO_RECUPERACION,
 		)
-		return _render_codigo_formulario(request, form, self.proposito)
+		return _render_codigo_formulario(
+			request,
+			form,
+		)
 
 	def post(self, request, *args, **kwargs):
 		form = FormularioCodigoYContrasena(
 			request.POST,
-			longitud=LONGITUD_CODIGO[self.proposito],
+			longitud=LONGITUD_CODIGO_RECUPERACION,
 		)
 		if not form.is_valid():
-			return _render_codigo_formulario(request, form, self.proposito)
+			return _render_codigo_formulario(
+				request,
+				form,
+			)
 
 		datos = form.cleaned_data
 		with transaction.atomic():
 			codigos = CodigoVerificacion.objects.select_for_update().filter(
 				usuario__email__iexact=datos['email'],
-				proposito=self.proposito,
+				proposito=CodigoVerificacion.Proposito.RECUPERACION,
 				usado_en__isnull=True,
 				expira_en__gt=timezone.now(),
 				intentos__lt=CODIGO_MAX_INTENTOS,
 			)
-			if self.proposito == CodigoVerificacion.Proposito.RECUPERACION:
-				codigos = codigos.filter(usuario__is_active=True)
+			codigos = codigos.filter(usuario__is_active=True)
 			codigo = codigos.order_by('-creado_en').first()
 			if codigo is None:
 				form.add_error(
 					'codigo',
 					'El código no es válido o expiró. Solicita uno nuevo para continuar.',
 				)
-				return _render_codigo_formulario(request, form, self.proposito)
+				return _render_codigo_formulario(
+					request,
+					form,
+				)
 			if not check_password(datos['codigo'], codigo.codigo_hash):
 				codigo.intentos += 1
 				codigo.save(update_fields=['intentos'])
@@ -320,40 +296,24 @@ class ConfirmarCodigoView(View):
 					'codigo',
 					f'El código es incorrecto. Después de {CODIGO_MAX_INTENTOS} intentos tendrás que solicitar otro.',
 				)
-				return _render_codigo_formulario(request, form, self.proposito)
+				return _render_codigo_formulario(
+					request,
+					form,
+				)
 
 			usuario = codigo.usuario
 			try:
 				validate_password(datos['password1'], user=usuario)
 			except ValidationError as error:
 				form.add_error('password1', error)
-				return _render_codigo_formulario(request, form, self.proposito)
+				return _render_codigo_formulario(request, form)
 
 			usuario.set_password(datos['password1'])
-			es_registro = self.proposito == CodigoVerificacion.Proposito.REGISTRO
-			if es_registro:
-				usuario.is_active = True
-				mensaje = 'Correo verificado. Ya puedes iniciar sesión con tu correo y contraseña.'
-			else:
-				mensaje = 'Tu contraseña se cambió correctamente. Ya puedes iniciar sesión.'
-			usuario.save(update_fields=['password', 'is_active'])
+			usuario.save(update_fields=['password'])
 			codigo.usado_en = timezone.now()
 			codigo.save(update_fields=['usado_en'])
 
-		if es_registro:
-			messages.success(request, mensaje)
-			return redirect('usuarios_login')
 		return redirect('usuarios_password_reset_complete')
-
-
-class ConfirmarRegistroView(ConfirmarCodigoView):
-	proposito = CodigoVerificacion.Proposito.REGISTRO
-
-
-class ConfirmarRecuperacionView(ConfirmarCodigoView):
-	"""Paso 2: valida el código recibido por correo y guarda la nueva contraseña."""
-
-	proposito = CodigoVerificacion.Proposito.RECUPERACION
 
 
 class RestablecimientoContrasenaCompletoView(TemplateView):

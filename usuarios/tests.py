@@ -402,18 +402,12 @@ class RecuperacionContrasenaTests(TestCase):
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
 class RegistroPublicoTests(TestCase):
-	@staticmethod
-	def codigo_enviado():
-		return next(
-			line.strip()
-			for line in mail.outbox[0].body.splitlines()
-			if re.fullmatch(r'\d{4}', line.strip())
-		)
-
 	def datos_registro(self, **cambios):
 		datos = {
 			'nombre_completo': 'Candidata de prueba',
 			'email': 'candidata@example.com',
+			'password1': 'Clave!Verde2026_Segura',
+			'password2': 'Clave!Verde2026_Segura',
 			'comuna': 'La Serena',
 			'tiene_experiencia': '',
 			'experiencia': '',
@@ -426,59 +420,58 @@ class RegistroPublicoTests(TestCase):
 
 		self.assertContains(response, 'Crear usuario')
 		self.assertContains(response, '¿Olvidaste tu contraseña?')
+		registro = self.client.get(reverse('usuarios_registro'))
+		self.assertContains(registro, 'name="password1"')
+		self.assertContains(registro, 'name="password2"')
+		self.assertContains(registro, 'Crear cuenta')
+		self.assertNotContains(registro, 'Enviar código al correo')
 
-	def test_registro_verifica_correo_guarda_perfil_y_crea_contrasena(self):
+	def test_registro_crea_cuenta_activa_con_contrasena_sin_codigo(self):
 		response = self.client.post(
 			reverse('usuarios_registro'),
 			self.datos_registro(),
 		)
 
-		self.assertRedirects(
-			response,
-			f'{reverse("usuarios_registro_confirmar")}?email=candidata%40example.com',
-		)
+		self.assertRedirects(response, reverse('usuarios_login'))
 		usuario = get_user_model().objects.get(username='candidata@example.com')
-		self.assertFalse(usuario.is_active)
-		self.assertFalse(usuario.has_usable_password())
+		self.assertTrue(usuario.is_active)
+		self.assertTrue(usuario.check_password('Clave!Verde2026_Segura'))
 		perfil = PerfilPostulante.objects.get(correo='candidata@example.com')
 		self.assertEqual(perfil.region, 'Región de Coquimbo')
 		self.assertEqual(perfil.comuna, 'La Serena')
 		self.assertFalse(perfil.tiene_experiencia)
-		self.assertEqual(mail.outbox[0].to, ['candidata@example.com'])
+		self.assertEqual(mail.outbox, [])
+		self.assertFalse(usuario.codigos_verificacion.exists())
+		login = self.client.post(reverse('usuarios_login'), {
+			'username': usuario.username,
+			'password': 'Clave!Verde2026_Segura',
+		})
+		self.assertEqual(login.status_code, 302)
+		self.assertEqual(login['Location'], reverse('redireccion_dashboard'))
+		self.assertIn('_auth_user_id', self.client.session)
 
-		contrasena = 'Contrasena-segura-934!'
+	def test_registro_rechaza_contrasenas_distintas(self):
 		response = self.client.post(
-			reverse('usuarios_registro_confirmar'),
-			{
-				'email': usuario.email,
-				'codigo': self.codigo_enviado(),
-				'password1': contrasena,
-				'password2': contrasena,
-			},
-			follow=True,
-		)
-
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Correo verificado.')
-		usuario.refresh_from_db()
-		self.assertTrue(usuario.is_active)
-		self.assertTrue(usuario.check_password(contrasena))
-		self.assertTrue(
-			usuario.codigos_verificacion.filter(usado_en__isnull=False).exists(),
-		)
-
-	def test_verificacion_muestra_cuatro_casillas_para_el_codigo(self):
-		self.client.post(
 			reverse('usuarios_registro'),
-			self.datos_registro(),
+			self.datos_registro(password2='Otra!ClaveSegura2026'),
 		)
 
-		response = self.client.get(reverse('usuarios_registro_confirmar'))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Las contraseñas no coinciden.')
+		self.assertFalse(get_user_model().objects.filter(email='candidata@example.com').exists())
+
+	def test_registro_rechaza_contrasena_debil(self):
+		response = self.client.post(
+			reverse('usuarios_registro'),
+			self.datos_registro(
+				password1='12345678',
+				password2='12345678',
+			),
+		)
 
 		self.assertEqual(response.status_code, 200)
-		html = response.content.decode()
-		self.assertEqual(len(re.findall(r'<input[^>]*data-code-digit', html)), 4)
-		self.assertEqual(html.count('placeholder="_"'), 4)
+		self.assertContains(response, 'Esta contraseña es demasiado común.')
+		self.assertFalse(get_user_model().objects.filter(email='candidata@example.com').exists())
 
 	def test_registro_solicita_experiencia_cuando_se_indica_que_si(self):
 		response = self.client.post(
@@ -503,10 +496,7 @@ class RegistroPublicoTests(TestCase):
 			),
 		)
 
-		self.assertRedirects(
-			response,
-			f'{reverse("usuarios_registro_confirmar")}?email=candidata%40example.com',
-		)
+		self.assertRedirects(response, reverse('usuarios_login'))
 		perfil = PerfilPostulante.objects.get(correo='candidata@example.com')
 		self.assertEqual(perfil.region, 'Región Metropolitana de Santiago')
 		self.assertEqual(perfil.comuna, 'Santiago')
