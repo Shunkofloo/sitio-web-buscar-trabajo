@@ -41,7 +41,7 @@
             </p>
             {% endif %}
             <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
-                {% if perms.eventos.add_postulacion %}
+                {% if perms.eventos.add_postulacion or es_cliente %}
                     <a class="btn btn-primary" href="{% url 'postulacion_crear' %}?oferta={{ oferta.pk }}">Registrar postulación</a>
                 {% endif %}
                 {% if oferta.empresa.correo_contacto %}

@@ -70,17 +70,40 @@ class AutenticacionDjangoTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'Usuario o contraseña incorrectos.')
 
-	def test_login_de_usuario_sin_grupo_muestra_mensaje_claro(self):
+	def test_login_de_usuario_sin_rol_lo_envia_al_espacio_de_cliente(self):
 		self.usuario.groups.clear()
 		response = self.client.post('/usuarios/login/', {
 			'username': 'estudiante',
 			'password': 'clave-segura',
 		}, follow=True)
 
-		self.assertContains(
-			response,
-			'Tu cuenta no tiene asignado un grupo con un dashboard disponible.',
-		)
+		self.assertEqual(response.redirect_chain, [
+			('/usuarios/dashboard/', 302),
+			('/usuarios/dashboard/cliente/', 302),
+		])
+		self.assertContains(response, 'Encuentra una oportunidad para ti')
+		self.assertContains(response, 'Buscar empleos')
+		self.assertContains(response, 'Mi perfil')
+		self.assertEqual(response.context['nombre_grupo_usuario'], 'Cliente')
+
+	def test_cliente_puede_abrir_su_perfil_y_formulario_de_postulacion(self):
+		self.usuario.groups.clear()
+		self.client.force_login(self.usuario)
+
+		perfil = self.client.get('/usuarios/perfil/')
+		postulacion = self.client.get('/gestion/postulaciones/registrar/')
+		ofertas = self.client.get('/ofertas/')
+
+		self.assertEqual(perfil.status_code, 200)
+		self.assertEqual(postulacion.status_code, 200)
+		self.assertContains(ofertas, 'Registrar postulación')
+
+	def test_usuario_con_rol_interno_no_accede_al_dashboard_cliente(self):
+		self.client.force_login(self.usuario)
+		response = self.client.get('/usuarios/dashboard/cliente/')
+
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(response.url, '/usuarios/dashboard/supervisor/')
 
 	def test_dashboard_requiere_autenticacion_django(self):
 		response = self.client.get('/usuarios/dashboard/supervisor/')

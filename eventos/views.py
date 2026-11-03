@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, UpdateView
 
 from usuarios.mixins import LoginYPermisoRequeridoMixin
+from usuarios.roles import obtener_dashboard_usuario
 
 from usuarios.models import PerfilPostulante
 
@@ -256,6 +257,14 @@ class PostulacionCrearView(LoginYPermisoRequeridoMixin, FormView):
     form_class = RegistrarPostulacionForm
     template_name = 'eventos/postulacion_formulario.html'
     permission_required = 'eventos.add_postulacion'
+
+    def has_permission(self):
+        if not self.request.user.is_authenticated:
+            return False
+        return (
+            super().has_permission()
+            or obtener_dashboard_usuario(self.request.user)[0] == 'Cliente'
+        )
 
     def get_initial(self):
         initial = super().get_initial()

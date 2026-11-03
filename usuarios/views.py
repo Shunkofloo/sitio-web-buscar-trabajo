@@ -406,19 +406,13 @@ class UsuarioEliminarView(RedireccionDespuesGestionMixin, LoginYPermisoRequerido
 @login_required
 def redireccion_dashboard(request):
 	_, dashboard_url = obtener_dashboard_usuario(request.user)
-	if dashboard_url is None:
-		messages.error(
-			request,
-			'Tu cuenta no tiene asignado un grupo con un dashboard disponible. Contacta al administrador.',
-		)
-		return redirect('eventos_inicio')
 	return redirect(dashboard_url)
 
 
 @login_required
 def perfil_usuario(request):
-	_, dashboard_url = obtener_dashboard_usuario(request.user)
-	if dashboard_url:
+	nombre_dashboard, dashboard_url = obtener_dashboard_usuario(request.user)
+	if nombre_dashboard != 'Cliente':
 		messages.info(
 			request,
 			'El perfil profesional está disponible para las cuentas de usuarios postulantes.',
@@ -483,6 +477,14 @@ def dashboard_supervisor(request):
 @login_required
 def dashboard_administrativo(request):
 	return _mostrar_dashboard(request, 'Administrativo')
+
+
+@login_required
+def dashboard_cliente(request):
+	nombre_dashboard, dashboard_url = obtener_dashboard_usuario(request.user)
+	if nombre_dashboard != 'Cliente':
+		return redirect(dashboard_url)
+	return render(request, 'usuarios/dashboard_cliente.html')
 
 
 def permission_denied(request, exception=None):

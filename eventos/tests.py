@@ -5,7 +5,7 @@ from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.utils import timezone
 
 from usuarios.models import PerfilPostulante
@@ -119,6 +119,33 @@ class OfertasPublicasTests(TestCase):
 		self.assertNotContains(response, 'Modificar')
 		self.assertNotContains(response, 'Eliminar')
 		self.assertNotContains(response, 'Agregar oferta')
+
+	def test_cliente_autenticado_puede_postular_a_una_oferta(self):
+		usuario = get_user_model().objects.create_user(
+			username='cliente@example.com',
+			password='clave-segura',
+		)
+		self.client.force_login(usuario)
+
+		response = self.client.get('/ofertas/')
+
+		self.assertContains(response, 'Registrar postulación')
+		self.assertEqual(
+			response.context['nombre_grupo_usuario'],
+			'Cliente',
+		)
+
+	def test_usuario_con_rol_interno_sin_permiso_no_puede_postular(self):
+		usuario = get_user_model().objects.create_user(
+			username='supervisor@example.com',
+			password='clave-segura',
+		)
+		usuario.groups.add(Group.objects.create(name='Supervisor'))
+		self.client.force_login(usuario)
+
+		response = self.client.get('/gestion/postulaciones/registrar/')
+
+		self.assertEqual(response.status_code, 403)
 
 	def test_portada_enlaza_al_listado_de_ofertas(self):
 		response = self.client.get('/eventos/')

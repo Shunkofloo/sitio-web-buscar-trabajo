@@ -1,13 +1,21 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard {{ nombre_dashboard }}{% endblock %}
 {% block content %}
-{% if nombre_dashboard == 'Administrador' %}
+{% if nombre_dashboard != 'Cliente' %}
 <div class="admin-dashboard">
     <section class="admin-hero">
         <div class="admin-hero-copy">
-            <span class="admin-eyebrow">Centro de control</span>
-            <h1>Panel de administración</h1>
-            <p>Gestiona las principales áreas de Buscar trabajo desde un solo lugar.</p>
+            <span class="admin-eyebrow">Centro de control · {{ nombre_dashboard }}</span>
+            {% if nombre_dashboard == 'Administrador' %}
+                <h1>Panel de administración</h1>
+                <p>Gestiona las principales áreas de Buscar trabajo desde un solo lugar.</p>
+            {% elif nombre_dashboard == 'Supervisor' %}
+                <h1>Panel de supervisión</h1>
+                <p>Coordina empresas, oportunidades laborales y el seguimiento de postulaciones.</p>
+            {% else %}
+                <h1>Panel administrativo</h1>
+                <p>Consulta la actividad de la plataforma y apoya la gestión de postulaciones.</p>
+            {% endif %}
         </div>
         <div class="admin-account">
             <span class="admin-avatar" aria-hidden="true">{{ request.user.get_full_name|default:request.user.username|first|upper }}</span>
@@ -90,22 +98,6 @@
         <span class="admin-help-mark" aria-hidden="true">i</span>
         <p><strong>Acceso seguro</strong> · Las opciones disponibles dependen de los permisos asignados a tu cuenta.</p>
     </aside>
-</div>
-{% else %}
-<section class="page-header text-center">
-    <div class="container">
-        <h1 class="display-6 fw-bold mb-2">Dashboard {{ nombre_dashboard }}</h1>
-        <p class="mb-0">Has iniciado sesión con el grupo {{ nombre_dashboard }}.</p>
-    </div>
-</section>
-
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-        <div class="section-card p-4">
-            <h2 class="h4 fw-bold">Bienvenido/a, {{ request.user.get_full_name|default:request.user.username }}</h2>
-            <p class="mb-0">Desde aquí puedes continuar usando las secciones disponibles para tu cuenta.</p>
-        </div>
-    </div>
 </div>
 {% endif %}
 {% endblock %}

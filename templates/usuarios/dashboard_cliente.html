@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Mi espacio · Buscar trabajo{% endblock %}
+{% block content %}
+<section class="client-dashboard">
+    <div class="client-hero">
+        <div class="client-hero-copy">
+            <span class="client-eyebrow">Tu espacio profesional</span>
+            <h1>Encuentra una oportunidad para ti, {{ request.user.first_name|default:request.user.username }}</h1>
+            <p>Explora empleos publicados y conecta con oportunidades que se ajusten a tus intereses.</p>
+            <form class="client-search" action="{% url 'ofertas_lista' %}" method="get" role="search">
+                <label class="visually-hidden" for="client-job-search">Cargo, empresa o ubicación</label>
+                <input id="client-job-search" name="q" type="search" placeholder="Cargo, empresa o ubicación">
+                <button type="submit">Buscar empleos</button>
+            </form>
+            <a class="client-profile-link" href="{% url 'usuarios_perfil' %}">Completa tu perfil profesional <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="client-hero-art" aria-hidden="true">
+            <div class="client-art-orbit client-art-orbit-one"></div>
+            <div class="client-art-orbit client-art-orbit-two"></div>
+            <div class="client-art-card">
+                <span class="client-art-icon">✦</span>
+                <span class="client-art-label">Tu próximo paso</span>
+                <strong>Empieza aquí</strong>
+                <span class="client-art-line"></span>
+                <span class="client-art-line client-art-line-short"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="client-welcome">
+        <div>
+            <span class="client-section-label">Bienvenido/a</span>
+            <h2>Un buen trabajo puede ser el comienzo de algo grande.</h2>
+        </div>
+        <a class="client-browse-link" href="{% url 'ofertas_lista' %}">Explorar todas las vacantes <span aria-hidden="true">→</span></a>
+    </div>
+
+    <div class="client-feature-grid">
+        <a class="client-feature-card" href="{% url 'ofertas_lista' %}">
+            <span class="client-feature-number">01</span>
+            <span class="client-feature-icon" aria-hidden="true">⌕</span>
+            <h3>Busca oportunidades</h3>
+            <p>Filtra ofertas por cargo, empresa o ubicación y encuentra opciones para tu perfil.</p>
+            <span class="client-feature-action">Ver vacantes <span aria-hidden="true">→</span></span>
+        </a>
+        <a class="client-feature-card" href="{% url 'usuarios_perfil' %}">
+            <span class="client-feature-number">02</span>
+            <span class="client-feature-icon" aria-hidden="true">◎</span>
+            <h3>Prepara tu perfil</h3>
+            <p>Agrega tu experiencia y habilidades para tener tu información profesional a mano.</p>
+            <span class="client-feature-action">Editar perfil <span aria-hidden="true">→</span></span>
+        </a>
+        <a class="client-feature-card" href="{% url 'noticias_inicio' %}">
+            <span class="client-feature-number">03</span>
+            <span class="client-feature-icon" aria-hidden="true">↗</span>
+            <h3>Inspírate y aprende</h3>
+            <p>Revisa noticias y contenidos para acompañar tu búsqueda de empleo.</p>
+            <span class="client-feature-action">Leer noticias <span aria-hidden="true">→</span></span>
+        </a>
+    </div>
+</section>
+{% endblock %}

@@ -13,6 +13,7 @@ from .views import (
 	UsuarioListaView,
 	dashboard_administrador,
 	dashboard_administrativo,
+	dashboard_cliente,
 	dashboard_supervisor,
 	redireccion_dashboard,
 	perfil_usuario,
@@ -53,5 +54,10 @@ urlpatterns = [
 		'dashboard/administrativo/',
 		dashboard_administrativo,
 		name='usuarios_dashboard_administrativo',
+	),
+	path(
+		'dashboard/cliente/',
+		dashboard_cliente,
+		name='usuarios_dashboard_cliente',
 	),
 ]
